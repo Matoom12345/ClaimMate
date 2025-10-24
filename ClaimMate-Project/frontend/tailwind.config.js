@@ -1,8 +1,7 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
@@ -56,28 +55,45 @@ export default {
       },
       fontFamily: {
         // ClaimMate Fonts
-        sans: ['Poppins', 'Noto Sans Thai', 'system-ui', 'sans-serif'], // Primary font stack
-        thai: ['Noto Sans Thai', 'system-ui', 'sans-serif'], // For explicit Thai text if needed
-        en: ['Poppins', 'system-ui', 'sans-serif'], // For explicit English text if needed
+        sans: ['Poppins', 'Noto Sans Thai', 'system-ui', 'sans-serif'],
+        thai: ['Noto Sans Thai', 'system-ui', 'sans-serif'],
+        en: ['Poppins', 'system-ui', 'sans-serif'],
       },
-      boxShadow: { // เพิ่มเงาให้ดู "สวยงาม ดูมีอะไร"
+      backgroundImage: {
+        'gradient-primary': 'linear-gradient(135deg, #1976D2 0%, #42A5F5 100%)',
+        'gradient-secondary': 'linear-gradient(135deg, #00BFA5 0%, #26CAB5 100%)',
+        'gradient-success': 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+        'gradient-hero': 'linear-gradient(135deg, #1976D2 0%, #00BFA5 100%)',
+        'gradient-radial': 'radial-gradient(circle at top right, #1976D2 0%, transparent 70%)',
+      },
+      boxShadow: {
         'card': '0 2px 8px rgba(0, 0, 0, 0.08)',
         'card-hover': '0 4px 16px rgba(0, 0, 0, 0.12)',
         'button': '0 1px 3px rgba(0, 0, 0, 0.1)',
+        'glow-primary': '0 0 20px rgba(25, 118, 210, 0.3)',
+        'glow-secondary': '0 0 20px rgba(0, 191, 165, 0.3)',
       },
-      borderRadius: { // ขอบมนสำหรับ "Friendly Design"
+      borderRadius: {
         'card': '12px',
         'button': '8px',
+        'xl': '16px',
+        '2xl': '20px',
       },
       spacing: {
         '18': '4.5rem',
         '88': '22rem',
         '128': '32rem',
       },
-      animation: { // Animation เพื่อความ Fast & Responsive
+      animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',
+        'slide-in-right': 'slideInRight 0.4s ease-out',
+        'slide-in-left': 'slideInLeft 0.4s ease-out',
+        'bounce-gentle': 'bounceGentle 1s ease-in-out infinite',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'spin-slow': 'spin 3s linear infinite',
+        'float': 'float 3s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -92,6 +108,25 @@ export default {
           '0%': { transform: 'translateY(-10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+        slideInRight: {
+          '0%': { transform: 'translateX(20px)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        slideInLeft: {
+          '0%': { transform: 'translateX(-20px)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        bounceGentle: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-5px)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+      },
+      backdropBlur: {
+        xs: '2px',
       },
     },
   },

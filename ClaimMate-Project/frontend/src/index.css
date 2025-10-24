@@ -17,6 +17,8 @@
     /* ใช้ Charcoal Grey (#333333) เป็นสีข้อความหลัก */
     /* ใช้ Cloud White (#F9FAFB) เป็นสีพื้นหลังหลัก */
     @apply font-sans text-neutral-dark bg-neutral-white antialiased;
+    /* ⭐ เพิ่ม smooth scrolling สำหรับประสบการณ์ที่ดี */
+    scroll-behavior: smooth;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -28,6 +30,11 @@
   h2 { @apply text-2xl md:text-3xl; }
   h3 { @apply text-xl md:text-2xl; }
   h4 { @apply text-lg md:text-xl; }
+  
+  /* ⭐ Selection color เพื่อความสวยงาม */
+  ::selection {
+    @apply bg-primary-200 text-primary-900;
+  }
 }
 
 @layer components {
@@ -49,19 +56,59 @@
     @apply bg-neutral-400;
   }
   
-  /* Card Component - เพื่อความเป็น Friendly Design และดูมีอะไร (มีเงาและขอบมน) */
+  /* ⭐ Card Component - Friendly Design พร้อม hover effect ที่มหัศจรรย์ */
   .card {
-    @apply bg-white rounded-card shadow-card p-6 transition-shadow hover:shadow-card-hover;
+    @apply bg-white rounded-card shadow-card p-6 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1;
+  }
+  
+  /* Card แบบไม่มี hover effect */
+  .card-static {
+  @apply bg-white rounded-card shadow-card p-6 transition-all duration-300;
+}
+
+  /* ⭐ Glass Card - สำหรับ modern glass morphism effect */
+  .card-glass {
+    @apply bg-white/80 backdrop-blur-md rounded-card shadow-card p-6 border border-white/20 transition-all duration-300 hover:shadow-card-hover hover:bg-white/90;
   }
 
+  /* Primary Button - ปุ่มหลักใช้ Insurance Blue พร้อม hover effect */
+  .btn-primary {
+    @apply bg-primary-500 text-white rounded-button px-6 py-3 font-medium shadow-button;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary:hover {
+    @apply bg-primary-600 scale-105;
+    box-shadow: 0 0 20px rgba(25, 118, 210, 0.3);
+  }
+  
+  .btn-primary:active {
+    @apply scale-95;
+  }
+  
   /* Secondary Button - เพิ่มสไตล์ปุ่มที่เป็นเอกลักษณ์ */
   .btn-secondary {
-    @apply bg-secondary-500 text-white rounded-button px-4 py-2 font-medium transition-colors hover:bg-secondary-600 shadow-button;
+    @apply bg-secondary-500 text-white rounded-button px-6 py-3 font-medium shadow-button;
+    transition: all 0.3s ease;
   }
-
-  /* Primary Button - ปุ่มหลักใช้ Insurance Blue */
-  .btn-primary {
-    @apply bg-primary-500 text-white rounded-button px-4 py-2 font-medium transition-colors hover:bg-primary-600 shadow-button;
+  
+  .btn-secondary:hover {
+    @apply bg-secondary-600 scale-105;
+    box-shadow: 0 0 20px rgba(0, 191, 165, 0.3);
+  }
+  
+  .btn-secondary:active {
+    @apply scale-95;
+  }
+  
+  /* ⭐ Outline Button - สำหรับ secondary actions */
+  .btn-outline {
+    @apply bg-transparent border-2 border-primary-500 text-primary-500 rounded-button px-6 py-3 font-medium transition-all duration-300 hover:bg-primary-500 hover:text-white hover:scale-105 active:scale-95;
+  }
+  
+  /* ⭐ Ghost Button - สำหรับ tertiary actions */
+  .btn-ghost {
+    @apply bg-transparent text-primary-500 rounded-button px-6 py-3 font-medium transition-all duration-300 hover:bg-primary-50 active:scale-95;
   }
   
   /* Container - กำหนดความกว้างของเนื้อหาหลัก */
@@ -69,22 +116,96 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
   
-  /* Timeline Item - สำหรับการแสดง Progress ที่เป็นหัวใจของระบบ */
+  /* ⭐ Timeline Item - สำหรับการแสดง Progress ที่เป็นหัวใจของระบบ (ปรับปรุงแล้ว) */
   .timeline-item {
-    @apply relative pl-8 py-4 border-l-2 border-neutral-300 last:border-l-0;
+    @apply relative pl-10 py-6 border-l-2 border-neutral-200 last:border-l-0 transition-all duration-300 hover:border-primary-300;
   }
 
   .timeline-dot {
     /* จุดที่แสดงสถานะบน Timeline (แปลกใหม่ สวยงาม) */
-    @apply absolute -left-3 top-4 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-md;
+    @apply absolute -left-3.5 top-6 w-7 h-7 rounded-full bg-neutral-300 flex items-center justify-center shadow-md transition-all duration-300;
   }
   
-  .timeline-dot.is-done {
-    @apply bg-secondary-500; /* ใช้สีเขียว-เขียวฟ้าเมื่อเสร็จสิ้น */
+  .timeline-dot.is-pending {
+    @apply bg-neutral-300 text-neutral-500; /* รอดำเนินการ */
   }
   
   .timeline-dot.is-active {
-    @apply bg-primary-500 ring-4 ring-primary-200; /* จุดที่กำลังดำเนินการ */
+    @apply bg-primary-500 ring-4 ring-primary-200 text-white animate-pulse-slow; /* กำลังดำเนินการ */
+  }
+  
+  .timeline-dot.is-done {
+    @apply bg-secondary-500 text-white; 
+    box-shadow: 0 0 15px rgba(0, 191, 165, 0.4); /* Glow effect สำหรับ done state */
+  }
+  
+  /* ⭐ Badge Component - สำหรับแสดง status */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .badge-primary {
+    @apply bg-primary-100 text-primary-700;
+  }
+  
+  .badge-secondary {
+    @apply bg-secondary-100 text-secondary-700;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 text-green-700;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-700;
+  }
+  
+  .badge-neutral {
+    @apply bg-neutral-100 text-neutral-700;
+  }
+  
+  /* ⭐ Input Field - สวยงามและ user-friendly */
+  .input-field {
+    @apply w-full px-4 py-3 border border-neutral-300 rounded-button focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-300 bg-white;
+  }
+  
+  .input-field:hover {
+    @apply border-neutral-400;
+  }
+  
+  .input-field::placeholder {
+    @apply text-neutral-400;
+  }
+  
+  /* ⭐ Skeleton Loading - สำหรับ loading state ที่สวยงาม */
+  .skeleton {
+    @apply animate-pulse bg-neutral-200 rounded;
+  }
+  
+  /* ⭐ Divider - เส้นแบ่งที่สวยงาม */
+  .divider {
+    @apply border-t border-neutral-200 my-6;
+  }
+  
+  /* ⭐ Icon Container - สำหรับ icon ที่มีพื้นหลัง */
+  .icon-container {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300;
+  }
+  
+  .icon-container-primary {
+    @apply bg-primary-100 text-primary-600 hover:bg-primary-200;
+  }
+  
+  .icon-container-secondary {
+    @apply bg-secondary-100 text-secondary-600 hover:bg-secondary-200;
+  }
+  
+  .icon-container-success {
+    @apply bg-green-100 text-green-600 hover:bg-green-200;
   }
 }
 
@@ -98,8 +219,57 @@
     @apply animate-slide-up;
   }
   
+  .animate-down {
+    @apply animate-slide-down;
+  }
+  
+  .animate-right {
+    @apply animate-slide-in-right;
+  }
+  
+  .animate-left {
+    @apply animate-slide-in-left;
+  }
+  
   /* Text utilities */
   .text-balance {
     text-wrap: balance;
   }
+  
+  /* ⭐ Gradient Text - สำหรับหัวข้อที่โดดเด่น */
+  .text-gradient-primary {
+    @apply bg-gradient-primary bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-secondary {
+    @apply bg-gradient-secondary bg-clip-text text-transparent;
+  }
+  
+  /* ⭐ Backdrop Utilities */
+  .backdrop-glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* ⭐ Custom Animations for micro-interactions */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    to right,
+    #f3f4f6 0%,
+    #e5e7eb 20%,
+    #f3f4f6 40%,
+    #f3f4f6 100%
+  );
+  background-size: 1000px 100%;
 }
