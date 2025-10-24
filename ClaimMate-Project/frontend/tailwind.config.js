@@ -8,8 +8,8 @@ export default {
     extend: {
       colors: {
         // ClaimMate Brand Colors
-        primary: {
-          DEFAULT: '#1976D2', // Insurance Blue
+        primary: { // Insurance Blue
+          DEFAULT: '#1976D2', 
           50: '#E3F2FD',
           100: '#BBDEFB',
           200: '#90CAF9',
@@ -21,8 +21,8 @@ export default {
           800: '#0A3D91',
           900: '#082F71',
         },
-        secondary: {
-          DEFAULT: '#00BFA5', // เขียว-เขียวฟ้า
+        secondary: { // เขียว-เขียวฟ้า (ใช้เป็นสีเสริมเพื่อความ "แปลกใหม่")
+          DEFAULT: '#00BFA5', 
           50: '#E0F7F4',
           100: '#B2ECE4',
           200: '#80E0D3',
@@ -46,7 +46,7 @@ export default {
           700: '#374151',
           800: '#1F2937',
           900: '#111827',
-          dark: '#333333', // Charcoal Grey
+          dark: '#333333', // Charcoal Grey (ตัวอักษรหลัก)
         },
         // Status Colors
         success: '#10B981',
@@ -56,16 +56,16 @@ export default {
       },
       fontFamily: {
         // ClaimMate Fonts
-        sans: ['Poppins', 'Noto Sans Thai', 'system-ui', 'sans-serif'],
-        thai: ['Noto Sans Thai', 'system-ui', 'sans-serif'],
-        en: ['Poppins', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'Noto Sans Thai', 'system-ui', 'sans-serif'], // Primary font stack
+        thai: ['Noto Sans Thai', 'system-ui', 'sans-serif'], // For explicit Thai text if needed
+        en: ['Poppins', 'system-ui', 'sans-serif'], // For explicit English text if needed
       },
-      boxShadow: {
+      boxShadow: { // เพิ่มเงาให้ดู "สวยงาม ดูมีอะไร"
         'card': '0 2px 8px rgba(0, 0, 0, 0.08)',
         'card-hover': '0 4px 16px rgba(0, 0, 0, 0.12)',
         'button': '0 1px 3px rgba(0, 0, 0, 0.1)',
       },
-      borderRadius: {
+      borderRadius: { // ขอบมนสำหรับ "Friendly Design"
         'card': '12px',
         'button': '8px',
       },
@@ -74,7 +74,7 @@ export default {
         '88': '22rem',
         '128': '32rem',
       },
-      animation: {
+      animation: { // Animation เพื่อความ Fast & Responsive
         'fade-in': 'fadeIn 0.3s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',

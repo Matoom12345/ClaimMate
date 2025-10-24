@@ -1,7 +1,11 @@
+/* src/index.css */
 /* ClaimMate - Main CSS File */
 
 /* Import Fonts from Google Fonts */
+/* Poppins for English, Noto Sans Thai for Thai, ensuring both are available for the 'sans' stack */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+/* Import Material Icons Round for friendly, modern icons */
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
 
 @tailwind base;
 @tailwind components;
@@ -9,32 +13,25 @@
 
 @layer base {
   body {
+    /* ใช้ font-sans ที่รวม Poppins และ Noto Sans Thai แล้ว */
+    /* ใช้ Charcoal Grey (#333333) เป็นสีข้อความหลัก */
+    /* ใช้ Cloud White (#F9FAFB) เป็นสีพื้นหลังหลัก */
     @apply font-sans text-neutral-dark bg-neutral-white antialiased;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold text-neutral-dark;
+    @apply font-semibold text-neutral-dark; /* หัวข้อใช้ Charcoal Grey */
   }
   
-  h1 {
-    @apply text-3xl md:text-4xl;
-  }
-  
-  h2 {
-    @apply text-2xl md:text-3xl;
-  }
-  
-  h3 {
-    @apply text-xl md:text-2xl;
-  }
-  
-  h4 {
-    @apply text-lg md:text-xl;
-  }
+  /* ขนาดตัวอักษรสำหรับหัวข้อ ให้ดูดีและ Responsive */
+  h1 { @apply text-3xl md:text-4xl; }
+  h2 { @apply text-2xl md:text-3xl; }
+  h3 { @apply text-xl md:text-2xl; }
+  h4 { @apply text-lg md:text-xl; }
 }
 
 @layer components {
-  /* Custom scrollbar */
+  /* Custom scrollbar เพื่อความสวยงาม */
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -52,19 +49,47 @@
     @apply bg-neutral-400;
   }
   
-  /* Card Component */
+  /* Card Component - เพื่อความเป็น Friendly Design และดูมีอะไร (มีเงาและขอบมน) */
   .card {
     @apply bg-white rounded-card shadow-card p-6 transition-shadow hover:shadow-card-hover;
   }
+
+  /* Secondary Button - เพิ่มสไตล์ปุ่มที่เป็นเอกลักษณ์ */
+  .btn-secondary {
+    @apply bg-secondary-500 text-white rounded-button px-4 py-2 font-medium transition-colors hover:bg-secondary-600 shadow-button;
+  }
+
+  /* Primary Button - ปุ่มหลักใช้ Insurance Blue */
+  .btn-primary {
+    @apply bg-primary-500 text-white rounded-button px-4 py-2 font-medium transition-colors hover:bg-primary-600 shadow-button;
+  }
   
-  /* Container */
+  /* Container - กำหนดความกว้างของเนื้อหาหลัก */
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Timeline Item - สำหรับการแสดง Progress ที่เป็นหัวใจของระบบ */
+  .timeline-item {
+    @apply relative pl-8 py-4 border-l-2 border-neutral-300 last:border-l-0;
+  }
+
+  .timeline-dot {
+    /* จุดที่แสดงสถานะบน Timeline (แปลกใหม่ สวยงาม) */
+    @apply absolute -left-3 top-4 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center shadow-md;
+  }
+  
+  .timeline-dot.is-done {
+    @apply bg-secondary-500; /* ใช้สีเขียว-เขียวฟ้าเมื่อเสร็จสิ้น */
+  }
+  
+  .timeline-dot.is-active {
+    @apply bg-primary-500 ring-4 ring-primary-200; /* จุดที่กำลังดำเนินการ */
   }
 }
 
 @layer utilities {
-  /* Animation utilities */
+  /* Animation utilities - เพื่อความรวดเร็วและตอบสนอง */
   .animate-in {
     @apply animate-fade-in;
   }
