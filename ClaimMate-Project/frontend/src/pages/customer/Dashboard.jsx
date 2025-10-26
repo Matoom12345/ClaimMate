@@ -5,13 +5,11 @@ import axios from "axios";
 
 /**
  * Customer Dashboard - หน้าแรกแสดงภาพรวมการเคลม
- * 
- * Features:
+ * * Features:
  * 1. สถิติการเคลมทั้งหมด
  * 2. การเคลมที่กำลังดำเนินการ (พร้อม Timeline)
  * 3. การแจ้งเตือนและ Quick Actions
- * 
- * TODO: Backend Integration
+ * * TODO: Backend Integration
  * - GET /api/customer/dashboard - ดึงข้อมูล dashboard
  * - GET /api/customer/claims?status=active - เคลมที่กำลังดำเนินการ
  * - GET /api/customer/claims/stats - สถิติการเคลม
@@ -31,7 +29,7 @@ const CustomerDashboard = () => {
           total: 6,
           active: 3,
           completed: 3,
-          pending: 0,
+          // *** ส่วนที่ถูกลบ: pending: 0,
         },
         activeClaims: [
           {
@@ -110,7 +108,7 @@ const CustomerDashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6"> {/* แก้ไข: เปลี่ยนเป็น grid-cols-3 */}
         <div className="card hover:shadow-card-hover transition-all duration-300">
           <div className="flex items-center justify-between mb-4">
             <div className="icon-container bg-primary-100 text-primary-600">
@@ -139,16 +137,6 @@ const CustomerDashboard = () => {
           </div>
           <p className="text-neutral-500 text-sm mb-1">เสร็จสิ้น</p>
           <h3 className="text-3xl font-bold text-success">{stats.completed}</h3>
-        </div>
-
-        <div className="card hover:shadow-card-hover transition-all duration-300">
-          <div className="flex items-center justify-between mb-4">
-            <div className="icon-container bg-neutral-100 text-neutral-600">
-              <span className="material-icons-round">schedule</span>
-            </div>
-          </div>
-          <p className="text-neutral-500 text-sm mb-1">รอดำเนินการ</p>
-          <h3 className="text-3xl font-bold text-neutral-600">{stats.pending}</h3>
         </div>
       </div>
 

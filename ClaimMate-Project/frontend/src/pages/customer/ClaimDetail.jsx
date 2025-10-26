@@ -4,14 +4,12 @@ import { ClaimTimeline, StatusBadge, Modal } from '../../components';
 
 /**
  * ClaimDetail - หน้ารายละเอียดเคลมแบบเต็ม
- * 
- * Features:
+ * * Features:
  * 1. ข้อมูลเคลมครบถ้วน
  * 2. Timeline ติดตามสถานะ
  * 3. รูปภาพเอกสารและความเสียหาย
  * 4. ดาวน์โหลดใบเคลม PDF
- * 
- * TODO: Backend Integration
+ * * TODO: Backend Integration
  * - GET /api/customer/claims/{id} - ดึงรายละเอียดเคลม
  * - GET /api/customer/claims/{id}/documents - ดึงเอกสาร/รูปภาพ
  * - GET /api/customer/claims/{id}/pdf - ดาวน์โหลด PDF
@@ -37,7 +35,7 @@ const ClaimDetail = () => {
         currentStep: 4,
         
         // ข้อมูลพื้นฐาน
-        reportDate: '2024-10-20 14:30',
+        // reportDate: '2024-10-20 14:30', // ลบวันที่แจ้งเคลมออก
         incidentDate: '2024-10-20 10:00',
         location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร 10310',
         description: 'ชนด้านหน้าจากรถที่วิ่งสวนทาง ความเสียหายบริเวณกันชนหน้า ไฟหน้า และฝากระโปรงหน้า',
@@ -79,7 +77,7 @@ const ClaimDetail = () => {
         
         // Timeline data
         timeline: {
-          reportedDate: '2024-10-20 14:30',
+          reportedDate: '2024-10-20 10:00', // ใช้ incidentDate แทน reportedDate ใน mock
           inspectionDate: '2024-10-21 10:00',
           approvalDate: '2024-10-22 15:30',
           garageSelectedDate: '2024-10-23 09:00',
@@ -176,10 +174,7 @@ const ClaimDetail = () => {
             </h2>
             
             <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">วันที่แจ้งเคลม</p>
-                <p className="font-medium text-neutral-dark">{claim.reportDate}</p>
-              </div>
+              {/* ลบ 'วันที่แจ้งเคลม' คงไว้เฉพาะ 'วันเกิดเหตุ' */}
               <div>
                 <p className="text-sm text-neutral-500 mb-1">วันเกิดเหตุ</p>
                 <p className="font-medium text-neutral-dark">{claim.incidentDate}</p>
