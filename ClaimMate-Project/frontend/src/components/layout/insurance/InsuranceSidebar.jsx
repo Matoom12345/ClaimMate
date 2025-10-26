@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 
 /**
  * InsuranceSidebar - Sidebar สำหรับบริษัทประกันภัย
- * เมนูหลัก: การเคลม, คำขออนุมัติ, ใบอนุมัติ, วิเคราะห์
+ * เมนูหลัก: การเคลม, คำขออนุมัติ, วิเคราะห์
  * 
  * Props:
  * - collapsed: boolean - เมื่อเป็น true จะแสดงแค่ icon
@@ -34,13 +34,6 @@ const InsuranceSidebar = ({ collapsed = false }) => {
             description: 'อนุมัติจากลูกค้าและอู่',
             badge: 5, // จำนวนคำขอที่รออนุมัติ
             highlight: true,
-        },
-        {
-            id: 'reports',
-            title: 'ใบอนุมัติซ่อม&จ่าย',
-            icon: 'receipt_long',
-            path: '/insurance/reports',
-            description: 'จัดทำและส่งเอกสาร',
         },
         {
             id: 'analytics',

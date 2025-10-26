@@ -1,22 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Input, TextArea, FileUpload, Modal, ConfirmModal } from '../../components';
+import { Input, TextArea, FileUpload, Select } from '../../components';
 
 /**
- * ClaimDetail - หน้ารายละเอียดเคสและอัปโหลดรายงาน
+ * ClaimDetail - หน้ารายละเอียดเคสและอัปโหลดรายงาน (Insurance)
  * 
  * จุดประสงค์หลัก:
- * - พนักงานลงพื้นที่อัปโหลดรูปภาพจากหลายมุม
+ * - พนักงานลงพื้นที่อัปโหลดรูปภาพจากหลายมุม (พร้อมชื่อและประเภท)
  * - กรอกรายละเอียดความเสียหาย
- * - ประเมินค่าซ่อมและระบุรายการซ่อม
- * - ส่งรายงานและ Export เป็น PDF
+ * - เลือกรายการซ่อมจาก dropdown
+ * - Auto-save บันทึกแบบร่างอัตโนมัติ
+ * - บันทึกและส่งออก เมื่อข้อมูลครบถ้วน
  * 
  * TODO: Backend Integration
  * - GET /api/insurance/claims/{id} - ดึงข้อมูลเคส
- * - POST /api/insurance/claims/{id}/report - บันทึกรายงาน
+ * - POST /api/insurance/claims/{id}/draft - บันทึกแบบร่าง (auto-save)
+ * - POST /api/insurance/claims/{id}/submit - บันทึกและส่งออก
  * - POST /api/insurance/claims/{id}/images - อัปโหลดรูปภาพ
  * - GET /api/insurance/claims/{id}/pdf - Export PDF
  */
+
+// รายการซ่อมที่เป็นไปได้ (ครอบคลุม)
+const REPAIR_ITEMS_OPTIONS = [
+  { value: 'bumper_front', label: 'เปลี่ยนกันชนหน้า', category: 'ด้านหน้า' },
+  { value: 'bumper_rear', label: 'เปลี่ยนกันชนหลัง', category: 'ด้านหลัง' },
+  { value: 'hood', label: 'ซ่อม/เปลี่ยนฝากระโปรงหน้า', category: 'ด้านหน้า' },
+  { value: 'headlight', label: 'เปลี่ยนไฟหน้า', category: 'ด้านหน้า' },
+  { value: 'taillight', label: 'เปลี่ยนไฟท้าย', category: 'ด้านหลัง' },
+  { value: 'door_front_left', label: 'ซ่อมประตูหน้าซ้าย', category: 'ด้านข้าง' },
+  { value: 'door_front_right', label: 'ซ่อมประตูหน้าขวา', category: 'ด้านข้าง' },
+  { value: 'door_rear_left', label: 'ซ่อมประตูหลังซ้าย', category: 'ด้านข้าง' },
+  { value: 'door_rear_right', label: 'ซ่อมประตูหลังขวา', category: 'ด้านข้าง' },
+  { value: 'fender_left', label: 'ซ่อมบังโคลนซ้าย', category: 'ด้านข้าง' },
+  { value: 'fender_right', label: 'ซ่อมบังโคลนขวา', category: 'ด้านข้าง' },
+  { value: 'windshield_front', label: 'เปลี่ยนกระจกหน้า', category: 'กระจก' },
+  { value: 'windshield_rear', label: 'เปลี่ยนกระจกหลัง', category: 'กระจก' },
+  { value: 'window_left', label: 'เปลี่ยนกระจกข้างซ้าย', category: 'กระจก' },
+  { value: 'window_right', label: 'เปลี่ยนกระจกข้างขวา', category: 'กระจก' },
+  { value: 'mirror_left', label: 'เปลี่ยนกระจกมองข้างซ้าย', category: 'กระจก' },
+  { value: 'mirror_right', label: 'เปลี่ยนกระจกมองข้างขวา', category: 'กระจก' },
+  { value: 'paint_front', label: 'พ่นสีด้านหน้า', category: 'พ่นสี' },
+  { value: 'paint_rear', label: 'พ่นสีด้านหลัง', category: 'พ่นสี' },
+  { value: 'paint_left', label: 'พ่นสีด้านซ้าย', category: 'พ่นสี' },
+  { value: 'paint_right', label: 'พ่นสีด้านขวา', category: 'พ่นสี' },
+  { value: 'tire_replace', label: 'เปลี่ยนยาง', category: 'ล้อ/ยาง' },
+  { value: 'rim_replace', label: 'เปลี่ยนล้อ', category: 'ล้อ/ยาง' },
+  { value: 'suspension', label: 'ซ่อมช่วงล่าง', category: 'ช่วงล่าง' },
+  { value: 'alignment', label: 'ตั้งศูนย์ล้อ', category: 'ช่วงล่าง' },
+  { value: 'other', label: '🔧 อื่นๆ (ระบุ)', category: 'อื่นๆ' },
+];
+
 const ClaimDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,17 +57,20 @@ const ClaimDetail = () => {
   const [claim, setClaim] = useState(null);
   
   // Form data for report
+  const [images, setImages] = useState([]);
   const [reportData, setReportData] = useState({
-    images: [],
+    inspectionDate: new Date().toISOString().split('T')[0],
+    inspectionTime: new Date().toTimeString().slice(0, 5),
     damageDescription: '',
-    estimatedCost: '',
     repairItems: [],
   });
   
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submitType, setSubmitType] = useState('draft'); // 'draft' or 'submit'
 
   useEffect(() => {
     // TODO: Backend - ดึงข้อมูลเคส
@@ -47,14 +83,10 @@ const ClaimDetail = () => {
         claimNumber: 'CLM-2024-001',
         status: 'inspecting',
         priority: 'normal',
-        
-        // ข้อมูลลูกค้า
         customerName: 'นายสมชาย ใจดี',
         customerPhone: '081-234-5678',
         customerEmail: 'somchai@example.com',
         policyNumber: 'POL-2024-001234',
-        
-        // ข้อมูลรถยนต์
         vehicle: {
           brand: 'Honda',
           model: 'City',
@@ -63,35 +95,51 @@ const ClaimDetail = () => {
           chassisNumber: 'JHMC12345678',
           color: 'ขาว',
         },
-        
-        // ข้อมูลเหตุการณ์
         incidentDate: '2024-10-20 10:00',
-        location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร',
+        location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง',
         description: 'ชนด้านหน้าจากรถที่วิ่งสวนทาง',
         reportedDate: '2024-10-20 14:30',
-        
-        // พนักงานที่รับผิดชอบ
         assignedOfficer: 'นางสาววิภา ประกันภัย',
         assignedDate: '2024-10-20 15:00',
-        
-        // รายงาน (ถ้ามี)
         report: null,
       });
       setLoading(false);
     }, 500);
   }, [id]);
 
+  // Auto-save ทุก 30 วินาที
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (reportData.damageDescription || images.length > 0 || reportData.repairItems.length > 0) {
+        handleAutoSave();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [reportData, images]);
+
+  const handleAutoSave = async () => {
+    setAutoSaving(true);
+    // TODO: Backend - บันทึกแบบร่าง
+    setTimeout(() => {
+      setLastSaved(new Date());
+      setAutoSaving(false);
+    }, 500);
+  };
+
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    
-    if (files) {
-      setReportData(prev => ({ ...prev, [name]: files }));
-    } else {
-      setReportData(prev => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setReportData(prev => ({ ...prev, [name]: value }));
     
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleImagesChange = (e) => {
+    setImages(e.target.files);
+    if (errors.images) {
+      setErrors(prev => ({ ...prev, images: '' }));
     }
   };
 
@@ -100,7 +148,12 @@ const ClaimDetail = () => {
       ...prev,
       repairItems: [
         ...prev.repairItems,
-        { id: Date.now(), description: '', cost: '' }
+        { 
+          id: Date.now(), 
+          type: '', // dropdown value
+          customDescription: '', // สำหรับ "อื่นๆ"
+          cost: '' 
+        }
       ]
     }));
   };
@@ -127,24 +180,47 @@ const ClaimDetail = () => {
     }, 0);
   };
 
+  const isFormComplete = () => {
+    // ตรวจสอบว่าข้อมูลครบทุกช่องหรือยัง
+    const hasImages = images.length > 0;
+    const allImagesHaveCaption = images.every(img => img.caption?.trim());
+    const hasDamageDescription = reportData.damageDescription.trim().length >= 20;
+    const hasRepairItems = reportData.repairItems.length > 0;
+    const allRepairItemsComplete = reportData.repairItems.every(item => {
+      const hasType = item.type !== '';
+      const hasCost = item.cost && parseFloat(item.cost) > 0;
+      const hasCustomDesc = item.type !== 'other' || item.customDescription.trim();
+      return hasType && hasCost && hasCustomDesc;
+    });
+
+    return hasImages && allImagesHaveCaption && hasDamageDescription && hasRepairItems && allRepairItemsComplete;
+  };
+
   const validate = () => {
     const newErrors = {};
     
-    if (reportData.images.length === 0) {
+    if (images.length === 0) {
       newErrors.images = 'กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป';
     }
+    
+    const imagesWithoutCaption = images.filter(img => !img.caption?.trim());
+    if (imagesWithoutCaption.length > 0) {
+      newErrors.images = `มีรูปภาพ ${imagesWithoutCaption.length} รูปที่ยังไม่ได้ใส่ชื่อ`;
+    }
+    
     if (!reportData.damageDescription || reportData.damageDescription.trim().length < 20) {
       newErrors.damageDescription = 'กรุณาอธิบายความเสียหายอย่างน้อย 20 ตัวอักษร';
     }
-    if (!reportData.estimatedCost || parseFloat(reportData.estimatedCost) <= 0) {
-      newErrors.estimatedCost = 'กรุณาระบุค่าซ่อมประเมิน';
-    }
+    
     if (reportData.repairItems.length === 0) {
       newErrors.repairItems = 'กรุณาเพิ่มรายการซ่อมอย่างน้อย 1 รายการ';
     } else {
-      const hasEmptyItem = reportData.repairItems.some(
-        item => !item.description || !item.cost || parseFloat(item.cost) <= 0
-      );
+      const hasEmptyItem = reportData.repairItems.some(item => {
+        const noType = !item.type;
+        const noCost = !item.cost || parseFloat(item.cost) <= 0;
+        const noCustomDesc = item.type === 'other' && !item.customDescription.trim();
+        return noType || noCost || noCustomDesc;
+      });
       if (hasEmptyItem) {
         newErrors.repairItems = 'กรุณากรอกรายการซ่อมให้ครบถ้วน';
       }
@@ -153,48 +229,66 @@ const ClaimDetail = () => {
     return newErrors;
   };
 
-  // TODO: Backend - บันทึกร่าง
   const handleSaveDraft = async () => {
     setSaving(true);
+    setSubmitType('draft');
     
+    // TODO: Backend - บันทึกแบบร่าง
     setTimeout(() => {
-      console.log('Save draft:', reportData);
+      console.log('Draft saved:', {
+        claimId: id,
+        images: images.map(img => ({
+          type: img.type,
+          caption: img.caption,
+          file: img.file.name,
+        })),
+        ...reportData,
+      });
+      
+      setLastSaved(new Date());
       setSaving(false);
-      alert('บันทึกร่างสำเร็จ');
+      alert('บันทึกแบบร่างสำเร็จ');
     }, 1000);
   };
 
-  // TODO: Backend - ส่งรายงาน
-  const handleSubmitReport = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      setShowSubmitModal(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     
     setSaving(true);
+    setSubmitType('submit');
     
+    // TODO: Backend - บันทึกและส่งออก
     setTimeout(() => {
-      console.log('Submit report:', reportData);
+      console.log('Report submitted:', {
+        claimId: id,
+        images: images.map(img => ({
+          type: img.type,
+          caption: img.caption,
+          file: img.file.name,
+        })),
+        ...reportData,
+      });
+      
       setSaving(false);
-      setShowSubmitModal(false);
       setShowSuccessModal(true);
-    }, 1500);
+    }, 2000);
   };
 
-  // TODO: Backend - Export PDF
   const handleExportPDF = () => {
     console.log('Export PDF for claim:', id);
-    // fetch(`/api/insurance/claims/${id}/pdf`)
-    //   .then(response => response.blob())
-    //   .then(blob => {
-    //     const url = window.URL.createObjectURL(blob);
-    //     const a = document.createElement('a');
-    //     a.href = url;
-    //     a.download = `claim-${id}.pdf`;
-    //     a.click();
-    //   });
+    // TODO: Backend - Export PDF
+  };
+
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    navigate('/insurance');
   };
 
   if (loading) {
@@ -211,20 +305,15 @@ const ClaimDetail = () => {
   if (!claim) {
     return (
       <div className="card-static text-center py-16">
-        <span className="material-icons-round text-6xl text-neutral-300 mb-4">
-          error_outline
-        </span>
-        <p className="text-neutral-500 text-lg mb-4">
-          ไม่พบข้อมูลเคส
-        </p>
-        <button onClick={() => navigate(-1)} className="btn-primary">
-          กลับ
-        </button>
+        <span className="material-icons-round text-6xl text-neutral-300 mb-4">error_outline</span>
+        <p className="text-neutral-500 text-lg mb-4">ไม่พบข้อมูลเคส</p>
+        <button onClick={() => navigate(-1)} className="btn-primary">กลับ</button>
       </div>
     );
   }
 
   const totalCost = calculateTotalCost();
+  const formComplete = isFormComplete();
 
   return (
     <div className="space-y-6">
@@ -239,77 +328,66 @@ const ClaimDetail = () => {
             <span>กลับ</span>
           </button>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-neutral-dark">
-              {claim.claimNumber}
-            </h1>
-            <span className={`
-              badge badge-sm
-              ${claim.priority === 'urgent' ? 'badge-error' : 
-                claim.priority === 'high' ? 'badge-warning' : 'badge-neutral'}
-            `}>
-              {claim.priority === 'urgent' ? 'ด่วนมาก' : 
-               claim.priority === 'high' ? 'ด่วน' : 'ปกติ'}
+            <h1 className="text-3xl font-bold text-neutral-dark">{claim.claimNumber}</h1>
+            <span className={`badge badge-sm ${claim.priority === 'urgent' ? 'badge-error' : claim.priority === 'high' ? 'badge-warning' : 'badge-neutral'}`}>
+              {claim.priority === 'urgent' ? 'ด่วนมาก' : claim.priority === 'high' ? 'ด่วน' : 'ปกติ'}
             </span>
           </div>
-          <p className="text-neutral-500">
-            อัปโหลดรายงานจากการตรวจสอบพื้นที่
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-neutral-500">อัปโหลดรายงานจากการตรวจสอบพื้นที่</p>
+            {lastSaved && (
+              <p className="text-xs text-neutral-400">
+                <span className="material-icons-round text-xs align-middle mr-1">check_circle</span>
+                บันทึกล่าสุด: {lastSaved.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+            {autoSaving && (
+              <p className="text-xs text-primary-500">
+                <span className="material-icons-round text-xs align-middle mr-1 animate-spin">sync</span>
+                กำลังบันทึก...
+              </p>
+            )}
+          </div>
         </div>
-        <button
-          onClick={handleExportPDF}
-          className="btn-outline flex items-center gap-2"
-        >
+        <button onClick={handleExportPDF} className="btn-outline flex items-center gap-2">
           <span className="material-icons-round">download</span>
           <span>Export PDF</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Claim Info Summary */}
+      <div className="card-static bg-primary-50 border-2 border-primary-200">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="material-icons-round text-3xl text-primary-600">assignment</span>
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-dark">ข้อมูลเคลม</h2>
+            <p className="text-sm text-neutral-600">{claim.claimNumber}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <p className="text-xs text-neutral-500 mb-1">ลูกค้า</p>
+            <p className="font-medium text-neutral-dark">{claim.customerName}</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 mb-1">รถยนต์</p>
+            <p className="font-medium text-neutral-dark">{claim.vehicle.brand} {claim.vehicle.model}</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 mb-1">ทะเบียน</p>
+            <p className="font-medium text-neutral-dark">{claim.vehicle.licensePlate}</p>
+          </div>
+          <div>
+            <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p>
+            <p className="font-medium text-neutral-dark">{claim.incidentDate}</p>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* ข้อมูลเคส */}
-          <div className="card-static">
-            <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
-              <span className="material-icons-round text-primary-500">info</span>
-              <span>ข้อมูลเคส</span>
-            </h2>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">ลูกค้า</p>
-                <p className="font-medium text-neutral-dark">{claim.customerName}</p>
-                <a href={`tel:${claim.customerPhone}`} className="text-sm text-primary-600 hover:underline">
-                  {claim.customerPhone}
-                </a>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">เลขกรมธรรม์</p>
-                <p className="font-medium text-neutral-dark">{claim.policyNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">รถยนต์</p>
-                <p className="font-medium text-neutral-dark">
-                  {claim.vehicle.brand} {claim.vehicle.model} ({claim.vehicle.year})
-                </p>
-                <p className="text-sm text-neutral-600">
-                  ทะเบียน: {claim.vehicle.licensePlate}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500 mb-1">วันเกิดเหตุ</p>
-                <p className="font-medium text-neutral-dark">{claim.incidentDate}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-neutral-500 mb-1">สถานที่เกิดเหตุ</p>
-                <p className="font-medium text-neutral-dark">{claim.location}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-neutral-500 mb-1">รายละเอียดจากลูกค้า</p>
-                <p className="font-medium text-neutral-dark">{claim.description}</p>
-              </div>
-            </div>
-          </div>
-
           {/* อัปโหลดรูปภาพ */}
           <div className="card-static">
             <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
@@ -318,21 +396,13 @@ const ClaimDetail = () => {
             </h2>
             
             <FileUpload
-              label=""
-              name="images"
-              files={reportData.images}
-              onChange={handleChange}
+              withDetails={true}
               accept="image/*"
               multiple
-              maxSize={10}
-              showPreview={true}
+              files={images}
+              onChange={handleImagesChange}
               error={errors.images}
             />
-            
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm text-neutral-700">
-              <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
-              ถ่ายรูปจากหลายมุม: ด้านหน้า, ด้านหลัง, ด้านข้าง, และส่วนที่เสียหายโดยละเอียด
-            </div>
           </div>
 
           {/* รายละเอียดความเสียหาย */}
@@ -341,265 +411,258 @@ const ClaimDetail = () => {
               <span className="material-icons-round text-primary-500">description</span>
               <span>รายละเอียดความเสียหาย</span>
             </h2>
-            
-            <TextArea
-              label=""
-              name="damageDescription"
-              value={reportData.damageDescription}
-              onChange={handleChange}
-              placeholder="อธิบายความเสียหายโดยละเอียด เช่น กันชนหน้าบุบ ไฟหน้าซ้ายแตก ฝากระโปรงหน้าเบี้ยว..."
-              rows={6}
-              error={errors.damageDescription}
-              helperText="อธิบายให้ละเอียดเพื่อประกอบการพิจารณาอนุมัติ"
-            />
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="วันที่ตรวจสอบ"
+                  name="inspectionDate"
+                  type="date"
+                  value={reportData.inspectionDate}
+                  onChange={handleChange}
+                  icon="calendar_today"
+                  required
+                />
+                
+                <Input
+                  label="เวลาตรวจสอบ"
+                  name="inspectionTime"
+                  type="time"
+                  value={reportData.inspectionTime}
+                  onChange={handleChange}
+                  icon="schedule"
+                  required
+                />
+              </div>
+
+              <TextArea
+                label="รายละเอียดความเสียหาย"
+                name="damageDescription"
+                value={reportData.damageDescription}
+                onChange={handleChange}
+                placeholder="อธิบายความเสียหายโดยละเอียด เช่น กันชนหน้าบุบ ไฟหน้าซ้ายแตก..."
+                rows={6}
+                required
+                error={errors.damageDescription}
+              />
+            </div>
           </div>
 
-          {/* รายการซ่อมและค่าใช้จ่าย */}
+          {/* รายการซ่อม */}
           <div className="card-static">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-neutral-dark flex items-center gap-2">
                 <span className="material-icons-round text-primary-500">build</span>
-                <span>รายการซ่อมและค่าใช้จ่าย</span>
+                <span>รายการซ่อม</span>
               </h2>
-              <button
-                type="button"
-                onClick={handleAddRepairItem}
-                className="btn-outline btn-sm flex items-center gap-1"
-              >
-                <span className="material-icons-round text-sm">add</span>
-                <span>เพิ่มรายการ</span>
+              <button type="button" onClick={handleAddRepairItem} className="btn-primary btn-sm">
+                <span className="material-icons-round mr-1">add</span>เพิ่มรายการ
               </button>
             </div>
 
-            <div className="space-y-3 mb-4">
-              {reportData.repairItems.length === 0 ? (
-                <div className="text-center py-8 text-neutral-400">
-                  <span className="material-icons-round text-4xl mb-2">add_circle_outline</span>
-                  <p className="text-sm">คลิก "เพิ่มรายการ" เพื่อระบุรายการซ่อม</p>
-                </div>
-              ) : (
-                reportData.repairItems.map((item, index) => (
-                  <div key={item.id} className="flex items-start gap-3 p-4 bg-neutral-50 rounded-lg">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Input
-                        label={`รายการที่ ${index + 1}`}
-                        value={item.description}
-                        onChange={(e) => handleRepairItemChange(item.id, 'description', e.target.value)}
-                        placeholder="เช่น กันชนหน้า, ไฟหน้าซ้าย..."
-                      />
-                      <Input
-                        label="ค่าใช้จ่าย (บาท)"
-                        type="number"
-                        value={item.cost}
-                        onChange={(e) => handleRepairItemChange(item.id, 'cost', e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRepairItem(item.id)}
-                      className="mt-7 p-2 text-error hover:bg-red-50 rounded-lg transition-colors duration-200"
-                      title="ลบรายการ"
-                    >
-                      <span className="material-icons-round">delete</span>
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
             {errors.repairItems && (
-              <p className="text-sm text-error mb-3">{errors.repairItems}</p>
+              <div className="mb-4 p-4 bg-error/10 border border-error rounded-lg">
+                <p className="text-error text-sm">{errors.repairItems}</p>
+              </div>
             )}
 
-            <div className="border-t border-neutral-200 pt-4">
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span className="text-neutral-700">รวมค่าซ่อมประเมิน</span>
-                <span className="text-primary-600 text-2xl">
-                  ฿{totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+            {reportData.repairItems.length === 0 ? (
+              <div className="text-center py-12 bg-neutral-50 rounded-lg">
+                <span className="material-icons-round text-5xl text-neutral-300 mb-3">construction</span>
+                <p className="text-neutral-500">ยังไม่มีรายการซ่อม กรุณาเพิ่มรายการ</p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {reportData.repairItems.map((item, index) => (
+                  <div key={item.id} className="p-4 bg-neutral-50 rounded-lg space-y-3">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm font-medium text-neutral-700">รายการที่ {index + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRepairItem(item.id)}
+                        className="text-neutral-400 hover:text-error transition-colors"
+                      >
+                        <span className="material-icons-round">delete</span>
+                      </button>
+                    </div>
 
-            <Input
-              label="ค่าซ่อมประเมินรวม (บาท)"
-              name="estimatedCost"
-              type="number"
-              value={reportData.estimatedCost}
-              onChange={handleChange}
-              placeholder="0.00"
-              icon="payments"
-              error={errors.estimatedCost}
-              className="mt-4"
-            />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Dropdown รายการซ่อม */}
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">
+                          ประเภทการซ่อม <span className="text-error">*</span>
+                        </label>
+                        <select
+                          value={item.type}
+                          onChange={(e) => handleRepairItemChange(item.id, 'type', e.target.value)}
+                          className="input-field"
+                        >
+                          <option value="">-- เลือกรายการ --</option>
+                          {REPAIR_ITEMS_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* ค่าใช้จ่าย */}
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">
+                          ค่าใช้จ่าย (บาท) <span className="text-error">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={item.cost}
+                          onChange={(e) => handleRepairItemChange(item.id, 'cost', e.target.value)}
+                          className="input-field"
+                        />
+                      </div>
+                    </div>
+
+                    {/* ถ้าเลือก "อื่นๆ" ให้แสดงช่องระบุ */}
+                    {item.type === 'other' && (
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-600 mb-1">
+                          ระบุรายละเอียด <span className="text-error">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="ระบุรายการซ่อมที่ไม่มีในตัวเลือก..."
+                          value={item.customDescription}
+                          onChange={(e) => handleRepairItemChange(item.id, 'customDescription', e.target.value)}
+                          className="input-field"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* สรุปค่าใช้จ่ายรวม */}
+                <div className="flex justify-between items-center p-4 bg-primary-50 rounded-lg border-2 border-primary-200">
+                  <span className="font-semibold text-neutral-dark">ประเมินค่าใช้จ่ายโดยรวม</span>
+                  <span className="text-2xl font-bold text-primary-600">฿{totalCost.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Progress */}
-          <div className="card-static">
-            <h3 className="font-semibold text-neutral-dark mb-4">
-              ความคืบหน้า
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center
-                  ${reportData.images.length > 0 ? 'bg-success text-white' : 'bg-neutral-200 text-neutral-400'}
-                `}>
-                  <span className="material-icons-round">
-                    {reportData.images.length > 0 ? 'check' : 'photo_camera'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">รูปภาพ</p>
-                  <p className="text-xs text-neutral-500">
-                    {reportData.images.length} / ไม่จำกัด
-                  </p>
+          {/* Status Card */}
+          {formComplete && (
+            <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="material-icons-round text-3xl">check_circle</span>
+                <div>
+                  <h3 className="font-bold">พร้อมส่งออก</h3>
+                  <p className="text-sm text-white/80">ข้อมูลครบถ้วนแล้ว</p>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center
-                  ${reportData.damageDescription ? 'bg-success text-white' : 'bg-neutral-200 text-neutral-400'}
-                `}>
-                  <span className="material-icons-round">
-                    {reportData.damageDescription ? 'check' : 'description'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">รายละเอียด</p>
-                  <p className="text-xs text-neutral-500">
-                    {reportData.damageDescription ? 'เสร็จสิ้น' : 'รอกรอก'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center
-                  ${reportData.repairItems.length > 0 ? 'bg-success text-white' : 'bg-neutral-200 text-neutral-400'}
-                `}>
-                  <span className="material-icons-round">
-                    {reportData.repairItems.length > 0 ? 'check' : 'build'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">รายการซ่อม</p>
-                  <p className="text-xs text-neutral-500">
-                    {reportData.repairItems.length} รายการ
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-white/90">
+                คุณสามารถบันทึกและส่งออกรายงานให้ลูกค้าได้แล้ว
+              </p>
             </div>
+          )}
+
+          {/* Info Card */}
+          <div className="card bg-gradient-primary text-white">
+            <span className="material-icons-round text-4xl mb-3">info</span>
+            <h3 className="font-semibold mb-2">ขั้นตอนการอัปโหลด</h3>
+            <ol className="text-sm text-white/80 space-y-2 list-decimal list-inside">
+              <li>อัปโหลดรูปภาพ (ใส่ชื่อทุกรูป)</li>
+              <li>กรอกรายละเอียดความเสียหาย</li>
+              <li>เลือกรายการซ่อม + ใส่ราคา</li>
+              <li>บันทึกแบบร่าง หรือส่งออก</li>
+            </ol>
           </div>
 
-          {/* Actions */}
-          <div className="card-static">
-            <h3 className="font-semibold text-neutral-dark mb-4">
-              การดำเนินการ
-            </h3>
-            
-            <div className="space-y-3">
-              <button
-                onClick={handleSaveDraft}
-                className="btn-outline w-full flex items-center justify-center gap-2"
-                disabled={saving}
-              >
-                <span className="material-icons-round">save</span>
-                <span>บันทึกร่าง</span>
-              </button>
-              
-              <button
-                onClick={() => setShowSubmitModal(true)}
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* บันทึกและส่งออก (ถ้าข้อมูลครบ) */}
+            {formComplete ? (
+              <button 
+                type="submit" 
                 className="btn-primary w-full flex items-center justify-center gap-2"
                 disabled={saving}
               >
-                <span className="material-icons-round">send</span>
-                <span>ส่งรายงาน</span>
+                {saving && submitType === 'submit' ? (
+                  <>
+                    <span className="material-icons-round animate-spin">refresh</span>
+                    <span>กำลังส่งออก...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-icons-round">send</span>
+                    <span>บันทึกและส่งออก</span>
+                  </>
+                )}
               </button>
-            </div>
+            ) : (
+              <button 
+                type="button"
+                onClick={handleSaveDraft}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+                disabled={saving}
+              >
+                {saving && submitType === 'draft' ? (
+                  <>
+                    <span className="material-icons-round animate-spin">refresh</span>
+                    <span>กำลังบันทึก...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-icons-round">save</span>
+                    <span>บันทึกแบบร่าง</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* ยกเลิก */}
+            <button 
+              type="button" 
+              onClick={() => navigate(-1)} 
+              className="btn-outline w-full" 
+              disabled={saving}
+            >
+              ยกเลิก
+            </button>
           </div>
 
-          {/* Info */}
-          <div className="card bg-gradient-secondary text-white">
-            <span className="material-icons-round text-3xl mb-2">info</span>
-            <h3 className="font-semibold mb-2">คำแนะนำ</h3>
-            <ul className="text-sm text-white/90 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="material-icons-round text-sm mt-0.5">check</span>
-                <span>ถ่ายรูปให้ชัดเจนจากทุกมุม</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="material-icons-round text-sm mt-0.5">check</span>
-                <span>ระบุรายการซ่อมให้ครบถ้วน</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="material-icons-round text-sm mt-0.5">check</span>
-                <span>ตรวจสอบข้อมูลก่อนส่ง</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Submit Confirmation Modal */}
-      <ConfirmModal
-        isOpen={showSubmitModal}
-        onClose={() => setShowSubmitModal(false)}
-        onConfirm={handleSubmitReport}
-        title="ยืนยันการส่งรายงาน"
-        message="คุณแน่ใจหรือไม่ที่จะส่งรายงานนี้? หลังจากส่งแล้วจะไม่สามารถแก้ไขได้"
-        confirmText="ส่งรายงาน"
-        cancelText="ยกเลิก"
-        variant="primary"
-        loading={saving}
-      />
-
-      {/* Success Modal */}
-      <Modal
-        isOpen={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          navigate('/insurance/claims/active');
-        }}
-        title="ส่งรายงานสำเร็จ"
-        size="md"
-        footer={
-          <button
-            onClick={() => {
-              setShowSuccessModal(false);
-              navigate('/insurance/claims/active');
-            }}
-            className="btn-primary w-full"
-          >
-            เข้าใจแล้ว
-          </button>
-        }
-      >
-        <div className="text-center py-4">
-          <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="material-icons-round text-4xl text-success">
-              check_circle
-            </span>
-          </div>
-          <p className="text-lg font-semibold text-neutral-dark mb-2">
-            ส่งรายงานสำเร็จ
-          </p>
-          <p className="text-neutral-600 mb-4">
-            รายงานของคุณถูกส่งเรียบร้อยแล้ว ระบบจะดำเนินการต่อไป
-          </p>
-          <div className="p-4 bg-blue-50 rounded-lg text-left">
+          {/* Auto-save Info */}
+          <div className="p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-neutral-700">
               <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
-              คุณสามารถดาวน์โหลด PDF ได้จากหน้ารายละเอียดเคส
+              ระบบจะบันทึกแบบร่างอัตโนมัติทุก 30 วินาที
             </p>
           </div>
         </div>
-      </Modal>
+      </form>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full animate-scale-in">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-icons-round text-5xl text-success">check_circle</span>
+              </div>
+              <h2 className="text-2xl font-bold text-neutral-dark mb-2">บันทึกและส่งออกสำเร็จ!</h2>
+              <p className="text-neutral-600 mb-6">รายงานถูกส่งให้ลูกค้าแล้ว</p>
+              <div className="p-4 bg-blue-50 rounded-lg text-left mb-6">
+                <p className="text-sm text-neutral-700">
+                  <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
+                  ลูกค้าสามารถดูรายละเอียดและดาวน์โหลดใบเคลม PDF ได้แล้ว
+                </p>
+              </div>
+              <button onClick={handleCloseSuccessModal} className="btn-primary w-full">เข้าใจแล้ว</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

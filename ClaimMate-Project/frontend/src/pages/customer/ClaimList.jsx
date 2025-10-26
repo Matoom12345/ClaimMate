@@ -4,14 +4,12 @@ import { StatusBadge } from '../../components';
 
 /**
  * ClaimList - หน้าแสดงรายการเคลมทั้งหมด
- * 
- * Features:
+ * * Features:
  * 1. แสดงรายการเคลมทั้งหมด
  * 2. Filter ตาม status
  * 3. Search ตามเลขเคลม/รายละเอียด
  * 4. ดาวน์โหลดใบเคลม PDF
- * 
- * TODO: Backend Integration
+ * * TODO: Backend Integration
  * - GET /api/customer/claims?status={status}&search={keyword} - ดึงรายการเคลม
  * - GET /api/customer/claims/{id}/pdf - ดาวน์โหลด PDF
  */
@@ -245,7 +243,7 @@ const ClaimList = () => {
                       <p className="font-medium text-neutral-dark">{claim.claimNumber}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-neutral-500 mb-1">วันที่แจ้ง</p>
+                      <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p> {/* แก้ไข: เปลี่ยน 'วันที่แจ้ง' เป็น 'วันเกิดเหตุ' */}
                       <p className="font-medium text-neutral-dark">{claim.date}</p>
                     </div>
                     <div>
