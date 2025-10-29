@@ -23,5 +23,5 @@ customerSchema.pre('save', async function (next) {
 });
 
 //ใช้ discriminator เพื่อสร้าง subclass จาก User
-const Customer = User.discriminator('Customer', customerSchema);
+const Customer = User.discriminator('customer', customerSchema);
 module.exports = Customer;

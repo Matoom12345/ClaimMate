@@ -7,7 +7,7 @@ const ClaimHistory = require('../models/ClaimHistory');
 // เปิดเคสใหม่
 router.post('/create', async (req, res) => {
     try {
-        const claim = new Claim(req.body); // body ต้องมี customerID, employeeID, carID
+        const claim = new Claim(req.body); // body ต้องมี customerID, insuranceID, carID
         await claim.save();
         res.status(201).json(claim);
     } catch (err) {
@@ -29,14 +29,14 @@ router.get('/all', async (req, res) => {
                 }},
             { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true }},
 
-            // join employee (จาก users)
+            // join insurance (จาก users)
             { $lookup: {
                     from: 'users',
-                    localField: 'employeeID',
-                    foreignField: 'employeeID',
-                    as: 'employee'
+                    localField: 'insuranceID',
+                    foreignField: 'insuranceID',
+                    as: 'insurance'
                 }},
-            { $unwind: { path: '$employee', preserveNullAndEmptyArrays: true }},
+            { $unwind: { path: 'insurance', preserveNullAndEmptyArrays: true }},
 
             // join car (จาก cars)
             { $lookup: {
@@ -69,14 +69,14 @@ router.get('/all', async (req, res) => {
                     },
                     customerPhone: '$customer.phoneNumber',
 
-                    employeeID: 1,
-                    employeeName: {
+                    insuranceID: 1,
+                    insuranceName: {
                         $concat: [
-                            { $ifNull: ['$employee.firstName', ''] }, ' ',
-                            { $ifNull: ['$employee.lastName', ''] }
+                            { $ifNull: ['insurance.firstName', ''] }, ' ',
+                            { $ifNull: ['insurance.lastName', ''] }
                         ]
                     },
-                    employeeEmail: '$employee.email',
+                    insuranceEmail: '$insurance.email',
 
                     carID: 1,
                     carBrand: '$car.brand',
@@ -97,12 +97,12 @@ router.get('/all', async (req, res) => {
 // ดึงเคสที่ยังดำเนินการอยู่ (พนักงาน)
 router.get('/active', async (req, res) => {
     try {
-        const { employeeID } = req.query;
-        if (!employeeID) return res.status(400).json({ message: 'employeeID is required' });
+        const { insuranceID } = req.query;
+        if (!insuranceID) return res.status(400).json({ message: 'insuranceID is required' });
 
         const active = await Claim.aggregate([
             { $match: {
-                    employeeID,
+                    insuranceID,
                     status: { $in: ['new', 'inspecting', 'pending_report'] }, // ✅ เปลี่ยน field
                     isClosed: false
                 }},
@@ -156,6 +156,66 @@ router.get('/active', async (req, res) => {
     } catch (err) {
         console.error('Error fetching active claims:', err);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+/**
+ * 1) ดึงใบเคลมทั้งหมดของ Customer (ตาม customerID)
+ * GET /api/claims/customer/:customerID
+ */
+router.get('/customer/:customerID', async (req, res) => {
+    try {
+        const { customerID } = req.params;
+
+        const claims = await Claim.find({ customerID }).sort({ incidentDate: -1 });
+
+        return res.json({
+            success: true,
+            claims
+        });
+
+    } catch (err) {
+        console.error('Error fetching customer claims:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+
+/**
+ * 2) สถิติเคลมของ Customer
+ * GET /api/claims/customer/:customerID/stats
+ */
+router.get('/customer/:customerID/stats', async (req, res) => {
+    try {
+        const { customerID } = req.params;
+
+        // 2.1 จำนวนเคลมทั้งหมด
+        const total = await Claim.countDocuments({ customerID });
+
+        // 2.2 จำนวนเคลมที่กำลังดำเนินการ
+        const ongoing = await Claim.countDocuments({
+            customerID,
+            isClosed: false
+        });
+
+        // 2.3 จำนวนเคลมที่เสร็จสิ้น
+        const completed = await Claim.countDocuments({
+            customerID,
+            isClosed: true
+        });
+
+        return res.json({
+            success: true,
+            stats: {
+                total,
+                ongoing,
+                completed
+            }
+        });
+
+    } catch (err) {
+        console.error('Error fetching customer stats:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 

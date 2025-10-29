@@ -8,7 +8,13 @@ const userSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName:  { type: String, required: true },
     email:     { type: String, required: true, unique: true },
-    role: { type: String, default: 'Employee' } // เพิ่ม default
+    role: { type: String, default: 'insurance' }, // เพิ่ม default
+
+    avatar: { type: String, default: null },
+
+    // login
+    otp: { type: String, default: null },
+    otpExpires: { type: Date, default: null },
 }, options);
 
 // สร้าง model หลัก

@@ -16,9 +16,8 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
 
   // TODO: Backend - Logout
   const handleLogout = () => {
-    console.log("Logout - TODO: Implement Backend");
-    // localStorage.removeItem('token');
-    // navigate('/login');
+    localStorage.removeItem('claimmate_user');  // ✅ ลบข้อมูล user
+    window.location.href = '/login';            // ✅ Redirect ไปหน้า login
   };
 
   // TODO: Backend - ดึงการแจ้งเตือน
@@ -157,13 +156,13 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
               >
                 <div className="w-10 h-10 bg-gradient-secondary rounded-full flex items-center justify-center text-white font-semibold">
                   {user?.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                    <img src={user.avatar} alt={user?.firstName + " " +user?.lastName} className="w-full h-full rounded-full object-cover" />
                   ) : (
-                    <span>{user?.name?.charAt(0) || 'U'}</span>
+                    <span>{user?.firstName?.charAt(0) || 'U'}</span>
                   )}
                 </div>
                 <div className="text-left hidden md:block">
-                  <p className="text-sm font-medium text-neutral-dark">{user?.name || 'ผู้ใช้'}</p>
+                  <p className="text-sm font-medium text-neutral-dark">{user?.firstName + " " +user?.lastName || 'ผู้ใช้'}</p>
                   <p className="text-xs text-neutral-500">{user?.position || 'เจ้าหน้าที่'}</p>
                 </div>
                 <span className="material-icons-round text-neutral-400">expand_more</span>
@@ -178,7 +177,7 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
                   ></div>
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-card-hover border border-neutral-200 overflow-hidden z-40 animate-scale-in">
                     <div className="p-4 border-b border-neutral-200">
-                      <p className="font-semibold text-neutral-dark">{user?.name || 'ผู้ใช้'}</p>
+                      <p className="font-semibold text-neutral-dark">{user?.firstName + " " +user?.lastName || 'ผู้ใช้'}</p>
                       <p className="text-sm text-neutral-500">{user?.email || 'user@example.com'}</p>
                       <p className="text-xs text-neutral-400 mt-1">{user?.position || 'เจ้าหน้าที่'}</p>
                     </div>

@@ -1,69 +1,55 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import InsuranceNavbar from './InsuranceNavbar';
 import InsuranceSidebar from './InsuranceSidebar';
 
-/**
- * InsuranceLayout - Layout หลักสำหรับหน้าบริษัทประกันภัย
- * ประกอบด้วย: Navbar (บน) + Sidebar (ซ้าย) + Content (กลาง)
- * 
- * TODO: Backend Integration Points
- * 1. User Authentication - ตรวจสอบ token/session
- *    - GET /api/auth/me - ดึงข้อมูล user ที่ login อยู่
- *    - ถ้าไม่มี token → redirect ไป /login
- * 
- * 2. User Role Check - ตรวจสอบว่าเป็น insurance role จริงหรือไม่
- *    - ถ้า role ไม่ใช่ 'insurance' → redirect ไปหน้าที่เหมาะสม
- */
 const InsuranceLayout = () => {
-  // State สำหรับ toggle sidebar
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [user, setUser] = useState(null);
 
-  // TODO: Backend - ดึงข้อมูล user จาก context/redux หรือ API
-  // const { user, loading } = useAuth();
-  // const navigate = useNavigate();
+  // ดึง user จาก localStorage หลัง login
+  useEffect(() => {
+    const stored = localStorage.getItem("claimmate_user");
+    if (!stored) {
+      navigate("/login");
+      return;
+    }
 
-  // TODO: Backend - ตรวจสอบ authentication
-  // useEffect(() => {
-  //   if (!loading && !user) {
-  //     navigate('/login');
-  //   }
-  //   if (user && user.role !== 'insurance') {
-  //     navigate(`/${user.role}/dashboard`);
-  //   }
-  // }, [user, loading, navigate]);
+    const parsed = JSON.parse(stored);
+    setUser(parsed);
 
-  // Mock user data (จะถูกแทนที่ด้วยข้อมูลจริงจาก Backend)
-  const mockUser = {
-    id: '1',
-    name: 'นางสาววิภา ประกันภัย',
-    email: 'vipa@insurance.com',
-    role: 'insurance',
-    position: 'Claims Adjuster',
-    avatar: null,
-  };
+    //ถ้า role ไม่ใช่ insurance → redirect ไปหน้าที่ถูกต้อง
+    if (parsed.role !== "insurance") {
+      navigate(`/${parsed.role}/dashboard`);
+    }
+  }, [navigate]);
+
+  // ยังโหลด user ไม่เสร็จ
+  if (!user) return <div className="p-6">กำลังโหลด...</div>;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      {/* Navbar */}
-      <InsuranceNavbar 
-        user={mockUser} 
-        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+      <div className="min-h-screen bg-neutral-50">
 
-      {/* Main Container */}
-      <div className="flex">
-        {/* Sidebar */}
-        <InsuranceSidebar collapsed={sidebarCollapsed} />
+        {/* Navbar */}
+        <InsuranceNavbar
+            user={user}
+            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-7xl mx-auto animate-fade-in">
-            <Outlet />
-          </div>
-        </main>
+        <div className="flex">
+
+          {/* Sidebar */}
+          <InsuranceSidebar collapsed={sidebarCollapsed} />
+
+          {/* Content */}
+          <main className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-7xl mx-auto animate-fade-in">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
   );
 };
 

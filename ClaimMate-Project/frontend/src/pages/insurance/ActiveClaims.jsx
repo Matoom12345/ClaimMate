@@ -33,7 +33,7 @@ const ActiveClaims = () => {
       try {
         // 1️⃣ ดึงรายการเคลมของพนักงาน
         const res = await axios.get('http://localhost:3000/api/claims/active', {
-          params: { employeeID: 'E00001' }
+          params: { insuranceID: 'E00001' }
         });
         const claimsData = res.data;
         setClaims(claimsData);

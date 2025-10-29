@@ -4,7 +4,7 @@ const Counter = require('./Counter');
 const claimSchema = new mongoose.Schema({
     claimNumber:    { type: String, unique: true, required: true },
     customerID:     { type: String, required: true },  // C00001
-    employeeID:     { type: String, required: true },  // E00001
+    insuranceID:     { type: String, required: true },  // E00001
     carID:          { type: String, required: true },  // CAR-00001 (หรือทะเบียน)
     location:{ type: String, required: true },
     detail:         { type: String, required: true },
@@ -34,8 +34,8 @@ claimSchema.pre('validate', async function (next) {
 });
 
 // ช่วยค้นหาเร็วขึ้น
-claimSchema.index({ currentState: 1, isClosed: 1 });
-claimSchema.index({ employeeID: 1 });
+claimSchema.index({ state: 1, isClosed: 1 });
+claimSchema.index({ insuranceID: 1 });
 claimSchema.index({ customerID: 1 });
 
 module.exports = mongoose.model('Claim', claimSchema);

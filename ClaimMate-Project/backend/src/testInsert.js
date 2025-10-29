@@ -5,7 +5,7 @@ const Car = require('./models/Car');
 const Customer = require('./models/Customer');
 const User = require('./models/User');     // base ของ discriminator
 const Garage = require('./models/Garage');
-const Employee = require('./models/Employee');
+const Insurance = require('./models/Insurance');
 const Claim = require('./models/Claim');
 const Counter = require('./models/Counter');
 const ClaimHistory = require('./models/ClaimHistory');
@@ -17,7 +17,7 @@ dotenv.config();
         await mongoose.connect(process.env.MONGO_URI);
         console.log('Connected to MongoDB');
 
-        // ล้างข้อมูลเก่า (users ครอบ Customer/Employee/Garage)
+        // ล้างข้อมูลเก่า (users ครอบ Customer/Insurance/Garage)
         await Promise.all([
             Claim.deleteMany({}),
             Car.deleteMany({}),
@@ -30,7 +30,7 @@ dotenv.config();
         // seed counters
         await Counter.insertMany([
             { _id: 'CUSTOMER', seq: 0 },
-            { _id: 'EMPLOYEE', seq: 0 },
+            { _id: 'INSURANCE', seq: 0 },
             { _id: 'GARAGE',   seq: 0 },
             { _id: 'CLAIM',    seq: 0 },
             { _id: 'CAR',      seq: 0 },
@@ -47,17 +47,17 @@ dotenv.config();
             { firstName: 'Here', lastName: 'HongThong', email: 'hong.man@ku.th', phoneNumber: '0804484873', garageName: 'Here Hong', location: '1234 - las vegas' },
             { firstName: 'Jae',  lastName: 'Pingpong',  email: 'ping.won@ku.th', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
         ];
-        const employeesData = [
-            { firstName: 'GG', lastName: 'EZ', email: 'GGEZ@gmail.com' }
+        const insurancesData = [
+            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th' }
         ];
 
         // ❗ ห้ามใช้ insertMany กับโมเดลที่มี pre-hook gen id
         const insertedCustomers = await Customer.create(customersData);
         const insertedGarages   = await Garage.create(garagesData);
-        const insertedEmployees = await Employee.create(employeesData);
+        const insertedInsurances = await Insurance.create(insurancesData);
 
         console.log('Customers IDs:', insertedCustomers.map(c => c.customerID));
-        console.log('Employees IDs:', insertedEmployees.map(e => e.employeeID));
+        console.log('Insurances IDs:', insertedInsurances.map(e => e.insuranceID));
         console.log('Garages IDs:',   insertedGarages.map(g => g.garageID));
 
         // ✅ ใช้ค่าที่ gen แล้วใน Car
@@ -98,12 +98,12 @@ dotenv.config();
 
         // ใช้ค่าที่ gen แล้วใน Claim
         // เลือกให้ตรงกับ schema Claim:
-        // - ถ้า Claim.customerID/employeeID/carID เป็น manual string → ใช้ .customerID/.employeeID/.carID
+        // - ถ้า Claim.customerID/insuranceID/carID เป็น manual string → ใช้ .customerID/.insuranceID/.carID
         // - ถ้าเป็น ObjectId → ใช้ ._id
         const claimsData = [
             {
                 customerID: insertedCustomers[0].customerID,  // หรือ _id
-                employeeID: insertedEmployees[0].employeeID,  // หรือ _id
+                insuranceID: insertedInsurances[0].insuranceID,  // หรือ _id
                 carID:      insertedCars[0].carID, // ตาม schema
                 location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร 10310',
                 detail: 'ชนด้านหน้าจากรถที่วิ่งสวนทาง ความเสียหายบริเวณกันชนหน้า ไฟหน้า และฝากระโปรงหน้า',

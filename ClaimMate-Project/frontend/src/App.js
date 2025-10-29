@@ -59,7 +59,7 @@ function App() {
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
         
-        {/* Root - Redirect to Login */}
+        {/* Root - Redirect to Log in */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* Login Page */}

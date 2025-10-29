@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User'); // Base Model
 // Import Discriminator Models
-const Employee = require('../models/Employee');
+const Insurance = require('../models/Insurance');
 const Customer = require('../models/Customer');
 const Garage = require('../models/Garage');
 // const authMiddleware = require('../middlewares/authMiddleware'); // *สมมติว่ามีการยืนยันตัวตน
@@ -22,7 +22,7 @@ router.get('/me', /* authMiddleware, */ async (req, res) => {
         // *** สำหรับการทดสอบ (หากไม่มี Auth Middleware) ***
         // ให้กำหนดค่าเองชั่วคราวเพื่อทดสอบ (ต้องมีข้อมูลใน MongoDB)
         const customId = 'E00001';
-        const role = 'Employee';
+        const role = 'insurance';
         // *******************************************************************
 
         if (!customId || !role) {
@@ -34,17 +34,17 @@ router.get('/me', /* authMiddleware, */ async (req, res) => {
         let selectFields = 'firstName lastName email role -_id';
 
         switch (role) {
-            case 'Employee':
-                Model = Employee;
-                query = { employeeID: customId };
-                selectFields += ' employeeID position';
+            case 'insurance':
+                Model = Insurance;
+                query = { insuranceID: customId };
+                selectFields += ' insuranceID position';
                 break;
-            case 'Customer':
+            case 'customer':
                 Model = Customer;
                 query = { customerID: customId };
                 selectFields += ' customerID phoneNumber';
                 break;
-            case 'Garage':
+            case 'garage':
                 Model = Garage;
                 query = { garageID: customId };
                 selectFields += ' garageID garageName location phoneNumber';

@@ -21,5 +21,5 @@ garageSchema.pre('validate', async function (next) {
     next();
 });
 
-const Garage = User.discriminator('Garage', garageSchema);
+const Garage = User.discriminator('garage', garageSchema);
 module.exports = Garage;

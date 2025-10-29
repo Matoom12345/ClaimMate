@@ -16,6 +16,7 @@ const userRoute = require('./routes/userRoute');
 const carRoute = require('./routes/carRoute');
 const claimRoute = require('./routes/claimRoute');
 const claimHistoryRoute = require('./routes/claimHistoryRoute');
+const authRoute = require('./routes/authRoute');
 
 // Middleware
 app.use(cors({
@@ -30,7 +31,7 @@ app.use('/api/claims', claimRoute);
 app.use('/api/cars', carRoute);
 app.use('/users', testerRoute);
 app.use('/api/claim-history', claimHistoryRoute);
-
+app.use('/api/auth', authRoute);
 
 
 // เชื่อมต่อ MongoDB
