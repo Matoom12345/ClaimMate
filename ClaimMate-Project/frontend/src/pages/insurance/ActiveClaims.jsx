@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../components';
+import axios from "axios";
 
 /**
  * ActiveClaims - หน้าแสดงเคสที่กำลังดำเนินการ
@@ -25,10 +26,47 @@ const ActiveClaims = () => {
     { value: 'pending_report', label: 'รอส่งรายงาน', icon: 'upload_file', color: 'info' },
   ];
 
+  const [latestDates, setLatestDates] = useState({});
+
   useEffect(() => {
-    // TODO: Backend - ดึงเคสที่กำลังดำเนินการ
-    // fetchActiveClaims();
-    
+    const fetchActiveClaims = async () => {
+      try {
+        // 1️⃣ ดึงรายการเคลมของพนักงาน
+        const res = await axios.get('http://localhost:3000/api/claims/active', {
+          params: { employeeID: 'E00001' }
+        });
+        const claimsData = res.data;
+        setClaims(claimsData);
+
+        // 2️⃣ ดึง reportedDate ล่าสุดของแต่ละเคส
+        const latestDates = await Promise.all(
+            claimsData.map(async (c) => {
+              try {
+                const res = await axios.get('http://localhost:3000/api/claim-history/latest', {
+                  params: { claimNumber: c.claimID }
+                });
+                return { [c.claimID]: res.data?.reportedDate || null };
+              } catch {
+                return { [c.claimID]: null };
+              }
+            })
+        );
+
+        // รวมเป็น object เช่น { 'CLM-2025-00001': '2025-10-27/14:00', ... }
+        const mergedDates = Object.assign({}, ...latestDates);
+        setLatestDates(mergedDates); // 👉 เก็บใน state ใหม่
+
+      } catch (err) {
+        console.error('Fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActiveClaims();
+  }, []);
+
+  /*
     // Mock data
     setTimeout(() => {
       setClaims([
@@ -113,6 +151,7 @@ const ActiveClaims = () => {
       setLoading(false);
     }, 500);
   }, []);
+  */
 
   // Filter claims
   const filteredClaims = claims.filter(claim => {
@@ -125,10 +164,10 @@ const ActiveClaims = () => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       return (
-        claim.claimNumber.toLowerCase().includes(term) ||
-        claim.customerName.toLowerCase().includes(term) ||
-        claim.licensePlate.toLowerCase().includes(term) ||
-        claim.location.toLowerCase().includes(term)
+          claim.claimID?.toLowerCase().includes(term) ||
+          claim.customerName?.toLowerCase().includes(term) ||
+          claim.licensePlate?.toLowerCase().includes(term) ||
+          claim.location?.toLowerCase().includes(term)
       );
     }
     

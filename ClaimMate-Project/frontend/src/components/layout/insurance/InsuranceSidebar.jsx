@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import axios from "axios";
 
 /**
  * InsuranceSidebar - Sidebar สำหรับบริษัทประกันภัย
@@ -9,8 +10,33 @@ import PropTypes from 'prop-types';
  * Props:
  * - collapsed: boolean - เมื่อเป็น true จะแสดงแค่ icon
  */
+
+
 const InsuranceSidebar = ({ collapsed = false }) => {
     const location = useLocation();
+
+    // ✅ สร้าง state สำหรับ Quick Stats
+    const [stats, setStats] = useState({
+        totalClaims: 0,
+        pendingClaims: 0,
+        completedClaims: 0
+    });
+
+    // ✅ ดึงข้อมูลจาก backend ตอนโหลด component
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await axios.get('http://localhost:3000/api/claims/stats/summary');
+                setStats(res.data);
+            } catch (err) {
+                console.error('Error fetching stats:', err);
+            }
+        };
+
+        fetchStats();
+        const interval = setInterval(fetchStats, 30000); // refresh ทุก 30 วิ
+        return () => clearInterval(interval);
+    }, []);
 
     const menuItems = [
         {
@@ -18,7 +44,7 @@ const InsuranceSidebar = ({ collapsed = false }) => {
             title: 'เคสที่กำลังดำเนินการ',
             icon: 'assignment',
             path: '/insurance/claims/active',
-            badge: 8, // เคสที่รอดำเนินการ
+            badge: stats.pendingClaims, // เคสที่รอดำเนินการ
         },
         {
             id: 'claims-history',
@@ -208,15 +234,15 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                         <div className="mt-6 space-y-3">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-neutral-500">เคลมทั้งหมด</span>
-                                <span className="font-semibold text-neutral-dark">156</span>
+                                <span className="font-semibold text-neutral-dark">{stats.totalClaims}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-neutral-500">รอดำเนินการ</span>
-                                <span className="font-semibold text-warning">12</span>
+                                <span className="font-semibold text-warning">{stats.pendingClaims}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-neutral-500">เสร็จสิ้นวันนี้</span>
-                                <span className="font-semibold text-success">8</span>
+                                <span className="text-neutral-500">เสร็จสิ้น</span>
+                                <span className="font-semibold text-success">{stats.completedClaims}</span>
                             </div>
                         </div>
                     </>

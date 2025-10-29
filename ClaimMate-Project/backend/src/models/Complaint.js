@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
 
-// Base Schema (Superclass)
 const complaintSchema = new mongoose.Schema({
-    complaintID:        { type: String, required: true, unique: true }, // id
-    claimID:            { type: mongoose.Schema.Types.ObjectId, ref: 'Claim' },
+    complaintID:        { type: String, required: true }, // id
+    claimNumber:            { type: String, required: true },
     complaintType:      { type: String, required: true },
     complaintHead:      { type: String, required: true },
     complaintDetail:    { type: String, required: true },

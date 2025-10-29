@@ -9,15 +9,29 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
 // Import Routes
+const testerRoute = require('./routes/testerRoute');
+
 const userRoute = require('./routes/userRoute');
+const carRoute = require('./routes/carRoute');
+const claimRoute = require('./routes/claimRoute');
+const claimHistoryRoute = require('./routes/claimHistoryRoute');
+
+// Middleware
+app.use(cors({
+    origin: 'http://localhost:3001', // frontend port (React)
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+}));
+app.use(express.json());
 
 // ใช้งาน Route
 app.use('/api/users', userRoute);
+app.use('/api/claims', claimRoute);
+app.use('/api/cars', carRoute);
+app.use('/users', testerRoute);
+app.use('/api/claim-history', claimHistoryRoute);
+
+
 
 // เชื่อมต่อ MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -26,12 +40,6 @@ mongoose.connect(process.env.MONGO_URI, {
 })
     .then(() => console.log('MongoDB connected successfully!'))
     .catch((err) => console.error('MongoDB connection failed:', err));
-
-// Import routes
-const testerRoute = require('./routes/testerRoute');
-
-// ใช้งาน route
-app.use('/users', testerRoute);
 
 // Route ทดสอบหลัก
 app.get('/', (req, res) => {

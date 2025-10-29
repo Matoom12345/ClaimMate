@@ -1,15 +1,39 @@
 const mongoose = require('mongoose');
-const {version} = require("mongoose");
+const Counter = require('./Counter');
 
 const carSchema = new mongoose.Schema({
-    customerID: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
-    model: { type: String, required: true },
-    licensePlate: { type: String, required: true },
-    color: { type: String, required: true },
-    engineID: { type: String, required: true, unique: true },
-    policyNumber: { type: String, required: true, unique: true },
-    insuranceLevel: { type: Number, enum: [1, 2, 3], required: true },
-    insuranceBalance: { type: Number,required: true }
-}, {versionKey: false},{ collection: 'cars' }); // <— ให้แน่ใจว่าชื่อ collection ถูกต้อง
+    carID:           { type: String, unique: true, required: true }, // gen อัตโนมัติ
+    customerID:      { type: String, required: true, index: true },  // ไม่ unique
+    brand:           { type: String, required: true, trim: true },
+    model:           { type: String, required: true, trim: true },
+    year:            { type: String, required: true },               // จะใช้ Number ก็ได้
+    licensePlate:    { type: String, required: true, unique: true }, // แนะนำให้ unique
+    color:           { type: String, required: true, trim: true },
+    engineID:        { type: String, required: true, unique: true },
+    policyNumber:    { type: String, required: true, unique: true },
+    insuranceLevel:  { type: Number, enum: [1, 2, 3], required: true },
+    insuranceBalance:{ type: Number, required: true }
+}, { versionKey: false, collection: 'cars' });
+
+// สร้าง carID ก่อน validate (จะไม่ล้มเพราะ required)
+carSchema.pre('validate', async function (next) {
+    if (this.isNew && !this.carID) {
+        const counter = await Counter.findByIdAndUpdate(
+            'CAR',
+            { $inc: { seq: 1 } },
+            { new: true, upsert: true }
+        );
+        this.carID = `CAR-${String(counter.seq).padStart(5, '0')}`; // รูปแบบอ่านง่ายขึ้น
+    }
+    next();
+});
+
+// Normalize ทะเบียนรถก่อนเซฟ (เช่น ตัดช่องว่าง/เป็นตัวพิมพ์ใหญ่)
+carSchema.pre('save', function (next) {
+    if (this.isModified('licensePlate') && typeof this.licensePlate === 'string') {
+        this.licensePlate = this.licensePlate.replace(/\s+/g, '').toUpperCase();
+    }
+    next();
+});
 
 module.exports = mongoose.model('Car', carSchema);
