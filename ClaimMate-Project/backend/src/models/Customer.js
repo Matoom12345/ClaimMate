@@ -5,7 +5,6 @@ const Counter = require('./Counter');
 const customerSchema = new mongoose.Schema({
     customerID: { type: String, unique: true },
     citizenID:  { type: String, required: true },
-    phoneNumber: { type: String, required: true }
 
 });
 

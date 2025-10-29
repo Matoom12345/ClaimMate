@@ -12,11 +12,11 @@ const PORT = process.env.PORT || 3000;
 // Import Routes
 const testerRoute = require('./routes/testerRoute');
 
-const userRoute = require('./routes/userRoute');
 const carRoute = require('./routes/carRoute');
 const claimRoute = require('./routes/claimRoute');
-const claimHistoryRoute = require('./routes/claimHistoryRoute');
 const authRoute = require('./routes/authRoute');
+const userRoute = require("./routes/userRoute");
+
 
 // Middleware
 app.use(cors({
@@ -26,12 +26,12 @@ app.use(cors({
 app.use(express.json());
 
 // ใช้งาน Route
-app.use('/api/users', userRoute);
+app.use('/users', testerRoute);
+
 app.use('/api/claims', claimRoute);
 app.use('/api/cars', carRoute);
-app.use('/users', testerRoute);
-app.use('/api/claim-history', claimHistoryRoute);
 app.use('/api/auth', authRoute);
+app.use("/api/users", userRoute);
 
 
 // เชื่อมต่อ MongoDB

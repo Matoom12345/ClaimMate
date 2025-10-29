@@ -6,7 +6,6 @@ const garageSchema = new mongoose.Schema({
     garageID:   { type: String, unique: true, required: true },
     garageName: { type: String, required: true },
     location:   { type: String },
-    phoneNumber:{ type: String },
 }, { _id: false }); // ใช้ _id เดียวกับ User (discriminator)
 
 garageSchema.pre('validate', async function (next) {

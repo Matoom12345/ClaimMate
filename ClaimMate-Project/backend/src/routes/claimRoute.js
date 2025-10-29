@@ -2,12 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const Claim = require('../models/Claim');
-const ClaimHistory = require('../models/ClaimHistory');
 
-// เปิดเคสใหม่
+/* ────────────────────────────────────────────────
+   ✅ เปิดเคสใหม่
+──────────────────────────────────────────────────*/
 router.post('/create', async (req, res) => {
     try {
-        const claim = new Claim(req.body); // body ต้องมี customerID, insuranceID, carID
+        const claim = new Claim(req.body);
         await claim.save();
         res.status(201).json(claim);
     } catch (err) {
@@ -16,50 +17,87 @@ router.post('/create', async (req, res) => {
     }
 });
 
-// ดึงเคสทั้งหมด (admin)
+/* ────────────────────────────────────────────────
+   ✅ ดึงเคสทั้งหมด (insurance/admin)
+──────────────────────────────────────────────────*/
 router.get('/all', async (req, res) => {
     try {
         const docs = await Claim.aggregate([
-            // join customer (จาก users)
-            { $lookup: {
+            /* Customer */
+            {
+                $lookup: {
                     from: 'users',
                     localField: 'customerID',
                     foreignField: 'customerID',
                     as: 'customer'
-                }},
-            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true }},
+                }
+            },
+            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
 
-            // join insurance (จาก users)
-            { $lookup: {
+            /* Insurance */
+            {
+                $lookup: {
                     from: 'users',
                     localField: 'insuranceID',
                     foreignField: 'insuranceID',
                     as: 'insurance'
-                }},
-            { $unwind: { path: 'insurance', preserveNullAndEmptyArrays: true }},
+                }
+            },
+            { $unwind: { path: '$insurance', preserveNullAndEmptyArrays: true } },
 
-            // join car (จาก cars)
-            { $lookup: {
+            /* Car */
+            {
+                $lookup: {
                     from: 'cars',
                     localField: 'carID',
                     foreignField: 'carID',
                     as: 'car'
-                }},
-            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true }},
+                }
+            },
+            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
 
-            // fields ที่จะส่งกลับ
-            { $project: {
-                    _id: 0,
-                    id: '$_id',
+            /* Garage */
+            {
+                $lookup: {
+                    from: "users",
+                    let: { gID: "$garageID" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$garageID", "$$gID"] } } },
+                        { $match: { role: "Garage" } }
+                    ],
+                    as: "garage"
+                }
+            },
+            { $unwind: { path: "$garage", preserveNullAndEmptyArrays: true } },
+
+            /* PROJECT */
+            {
+                $project: {
+                    id: "$_id",
                     claimNumber: 1,
+                    title: 1,
+                    detail: 1,
+                    location: 1,
+
                     state: 1,
-                    status: 1, // ✅ แทน currentState
+                    status: 1,
+                    currentStep: 1,
                     priorityLevel: 1,
                     isClosed: 1,
-                    incidentDate: 1,
-                    location: 1,
-                    detail: 1,
 
+                    incidentDate: 1,
+                    reportedDate: 1,
+                    inspectionDate: 1,
+                    approvalDate: 1,
+                    garageSelectedDate: 1,
+                    repairStartDate: 1,
+                    completedDate: 1,
+
+                    estimatedCost: 1,
+                    approvedCost: 1,
+                    additionalCost: 1,
+
+                    /* Customer */
                     customerID: 1,
                     customerName: {
                         $concat: [
@@ -69,22 +107,25 @@ router.get('/all', async (req, res) => {
                     },
                     customerPhone: '$customer.phoneNumber',
 
-                    insuranceID: 1,
+                    /* Insurance */
                     insuranceName: {
                         $concat: [
-                            { $ifNull: ['insurance.firstName', ''] }, ' ',
-                            { $ifNull: ['insurance.lastName', ''] }
+                            { $ifNull: ['$insurance.firstName', ''] }, ' ',
+                            { $ifNull: ['$insurance.lastName', ''] }
                         ]
                     },
-                    insuranceEmail: '$insurance.email',
 
-                    carID: 1,
+                    /* Car */
                     carBrand: '$car.brand',
                     carModel: '$car.model',
-                    carYear: '$car.year',
                     licensePlate: '$car.licensePlate',
-                    color: '$car.color',
-                }}
+
+                    /* Garage */
+                    garageName: '$garage.garageName',
+                    garagePhone: '$garage.phoneNumber',
+                    garageEmail: '$garage.email'
+                }
+            }
         ]);
 
         res.json(docs);
@@ -94,44 +135,47 @@ router.get('/all', async (req, res) => {
     }
 });
 
-// ดึงเคสที่ยังดำเนินการอยู่ (พนักงาน)
+/* ────────────────────────────────────────────────
+   ✅ Active Claims ของ Insurance
+──────────────────────────────────────────────────*/
 router.get('/active', async (req, res) => {
     try {
         const { insuranceID } = req.query;
         if (!insuranceID) return res.status(400).json({ message: 'insuranceID is required' });
 
         const active = await Claim.aggregate([
-            { $match: {
-                    insuranceID,
-                    status: { $in: ['new', 'inspecting', 'pending_report'] }, // ✅ เปลี่ยน field
-                    isClosed: false
-                }},
+            { $match: { insuranceID, isClosed: false } },
 
-            // join customer
-            { $lookup: {
+            /* Customer */
+            {
+                $lookup: {
                     from: 'users',
                     localField: 'customerID',
                     foreignField: 'customerID',
                     as: 'customer'
-                }},
-            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true }},
+                }
+            },
+            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
 
-            // join car
-            { $lookup: {
+            /* Car */
+            {
+                $lookup: {
                     from: 'cars',
                     localField: 'carID',
                     foreignField: 'carID',
                     as: 'car'
-                }},
-            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true }},
+                }
+            },
+            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
 
-            // map data ให้ frontend ใช้
-            { $project: {
-                    _id: 0,
-                    id: '$_id',
+            {
+                $project: {
+                    id: "$_id",
                     claimNumber: 1,
-                    status: 1, // ✅
+                    title: 1,
+                    status: 1,
                     priorityLevel: 1,
+                    currentStep: 1,
                     location: 1,
                     incidentDate: 1,
 
@@ -141,15 +185,12 @@ router.get('/active', async (req, res) => {
                             { $ifNull: ['$customer.lastName', ''] }
                         ]
                     },
-                    customerPhone: '$customer.phoneNumber',
-
-                    licensePlate: '$car.licensePlate',
-                    carBrand: '$car.brand',
+                    carBrand:'$car.brand',
                     carModel: '$car.model',
                     carYear: '$car.year',
-
-                    reportProgress: { $literal: 0 }
-                }}
+                    licensePlate: '$car.licensePlate'
+                }
+            }
         ]);
 
         res.json(active);
@@ -159,85 +200,177 @@ router.get('/active', async (req, res) => {
     }
 });
 
-/**
- * 1) ดึงใบเคลมทั้งหมดของ Customer (ตาม customerID)
- * GET /api/claims/customer/:customerID
- */
+/* ────────────────────────────────────────────────
+   ✅ Customer → เคลมทั้งหมด
+──────────────────────────────────────────────────*/
 router.get('/customer/:customerID', async (req, res) => {
     try {
-        const { customerID } = req.params;
+        const claims = await Claim.find({ customerID: req.params.customerID })
+            .sort({ incidentDate: -1 });
 
-        const claims = await Claim.find({ customerID }).sort({ incidentDate: -1 });
-
-        return res.json({
-            success: true,
-            claims
-        });
-
+        res.json({ success: true, claims });
     } catch (err) {
         console.error('Error fetching customer claims:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-
-/**
- * 2) สถิติเคลมของ Customer
- * GET /api/claims/customer/:customerID/stats
- */
+/* ────────────────────────────────────────────────
+   ✅ Customer Stats
+──────────────────────────────────────────────────*/
 router.get('/customer/:customerID/stats', async (req, res) => {
     try {
         const { customerID } = req.params;
 
-        // 2.1 จำนวนเคลมทั้งหมด
         const total = await Claim.countDocuments({ customerID });
+        const ongoing = await Claim.countDocuments({ customerID, isClosed: false });
+        const completed = await Claim.countDocuments({ customerID, isClosed: true });
 
-        // 2.2 จำนวนเคลมที่กำลังดำเนินการ
-        const ongoing = await Claim.countDocuments({
-            customerID,
-            isClosed: false
-        });
-
-        // 2.3 จำนวนเคลมที่เสร็จสิ้น
-        const completed = await Claim.countDocuments({
-            customerID,
-            isClosed: true
-        });
-
-        return res.json({
+        res.json({
             success: true,
-            stats: {
-                total,
-                ongoing,
-                completed
-            }
+            stats: { total, ongoing, completed }
         });
-
     } catch (err) {
-        console.error('Error fetching customer stats:', err);
+        console.error('Error fetching stats:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-// เปลี่ยนสถานะและบันทึกประวัติ
-router.patch('/:claimID/state', async (req, res) => {
+/* ────────────────────────────────────────────────
+   ✅ ✅ ✅ Claim Detail (Customer)
+   GET /api/claims/detail/:claimNumber
+──────────────────────────────────────────────────*/
+router.get('/detail/:claimNumber', async (req, res) => {
     try {
-        const { claimID } = req.params;
-        const { state, status, reportedDate } = req.body;
+        const claimNumber = req.params.claimNumber;
+
+        const claim = await Claim.aggregate([
+            { $match: { claimNumber } },
+
+            /* Customer */
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'customerID',
+                    foreignField: 'customerID',
+                    as: 'customer'
+                }
+            },
+            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+
+            /* Insurance Officer */
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "insuranceID",
+                    foreignField: "insuranceID",   // ✅ FIX
+                    as: "insurance"
+                }
+            },
+            { $unwind: { path: "$insurance", preserveNullAndEmptyArrays: true } },
+
+            /* Car */
+            {
+                $lookup: {
+                    from: 'cars',
+                    localField: 'carID',
+                    foreignField: 'carID',
+                    as: 'car'
+                }
+            },
+            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
+
+            /* Garage */
+            {
+                $lookup: {
+                    from: "users",
+                    let: { gID: "$garageID" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$garageID", "$$gID"] } } },
+                        { $match: { role: "Garage" } }
+                    ],
+                    as: "garage"
+                }
+            },
+            { $unwind: { path: "$garage", preserveNullAndEmptyArrays: true } },
+
+            /* PROJECT */
+            {
+                $project: {
+                    id: "$_id",
+                    claimNumber: 1,
+                    title: 1,
+                    detail: 1,
+                    location: 1,
+
+                    state: 1,
+                    status: 1,
+                    currentStep: 1,
+                    priorityLevel: 1,
+                    isClosed: 1,
+
+                    incidentDate: 1,
+                    reportedDate: 1,
+                    inspectionDate: 1,
+                    approvalDate: 1,
+                    garageSelectedDate: 1,
+                    repairStartDate: 1,
+                    completedDate: 1,
+
+                    estimatedCost: 1,
+                    approvedCost: 1,
+                    additionalCost: 1,
+
+                    /* Car */
+                    carModel: '$car.model',
+                    carBrand: '$car.brand',
+                    licensePlate: '$car.licensePlate',
+                    carColor: '$car.color',
+                    Year: '$car.year',
+
+                    /* Garage */
+                    garageName: '$garage.garageName',
+                    garagePhone: '$garage.phoneNumber',
+                    garageEmail: '$garage.email',
+
+                    /* ✅ Officer (Insurance User) */
+                    assignedOfficer: {
+                        name: {
+                            $concat: [
+                                { $ifNull: ['$insurance.firstName', ''] }, ' ',
+                                { $ifNull: ['$insurance.lastName', ''] }
+                            ]
+                        },
+                        phone: '$insurance.phoneNumber',
+                        email: '$insurance.email'
+                    }
+                }
+            }
+        ]);
+
+        res.json({ success: true, claim: claim[0] || null });
+
+    } catch (err) {
+        console.error('Error fetching claim detail:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+/* ────────────────────────────────────────────────
+   ✅ เปลี่ยน state/status + history
+──────────────────────────────────────────────────*/
+router.patch('/:claimNumber/state', async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+        const { state, status } = req.body;
 
         const updated = await Claim.findOneAndUpdate(
-            { claimID },
+            { claimNumber },
             { ...(state ? { state } : {}), ...(status ? { status } : {}) },
             { new: true }
         );
 
         if (!updated) return res.status(404).json({ message: 'Claim not found' });
-
-        await ClaimHistory.create({
-            claimNumber: claimID,
-            state: state || updated.state,
-            reportedDate: reportedDate || new Date().toISOString().slice(0,16).replace('T','/')
-        });
 
         res.json(updated);
     } catch (err) {
@@ -246,25 +379,28 @@ router.patch('/:claimID/state', async (req, res) => {
     }
 });
 
-// ดึงสรุปจำนวนเคลม
+/* ────────────────────────────────────────────────
+   Insurance Dashboard Summary
+   GET /api/claims/stats/summary
+──────────────────────────────────────────────────*/
 router.get('/stats/summary', async (req, res) => {
     try {
-        // นับทั้งหมด
-        const totalClaims = await Claim.countDocuments();
-
-        // เคสที่ยังไม่ปิด (isClosed: false)
+        const totalClaims = await Claim.countDocuments({});
         const pendingClaims = await Claim.countDocuments({
             isClosed: false,
+            status: { $in: ["new", "survey", "approved", "choose_garage", "repair"] }
         });
-
-        // เคสที่เสร็จสิ้น
         const completedClaims = await Claim.countDocuments({
-            state: 'completed' // <-- field ตรงกับใน DB
+            isClosed: true
         });
 
-        res.json({ totalClaims, pendingClaims, completedClaims });
+        res.json({
+            totalClaims,
+            pendingClaims,
+            completedClaims
+        });
     } catch (err) {
-        console.error('Error fetching summary stats:', err);
+        console.error("Error getting stats:", err);
         res.status(500).json({ message: 'Server error' });
     }
 });

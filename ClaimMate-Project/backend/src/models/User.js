@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
     lastName:  { type: String, required: true },
     email:     { type: String, required: true, unique: true },
     role: { type: String, default: 'insurance' }, // เพิ่ม default
-
+    phoneNumber:{ type: String, required: true},
     avatar: { type: String, default: null },
 
     // login

@@ -8,7 +8,6 @@ const Garage = require('./models/Garage');
 const Insurance = require('./models/Insurance');
 const Claim = require('./models/Claim');
 const Counter = require('./models/Counter');
-const ClaimHistory = require('./models/ClaimHistory');
 
 dotenv.config();
 
@@ -48,7 +47,7 @@ dotenv.config();
             { firstName: 'Jae',  lastName: 'Pingpong',  email: 'ping.won@ku.th', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
         ];
         const insurancesData = [
-            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th' }
+            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th', phoneNumber: '0964403868' }
         ];
 
         // ❗ ห้ามใช้ insertMany กับโมเดลที่มี pre-hook gen id
@@ -105,35 +104,22 @@ dotenv.config();
                 customerID: insertedCustomers[0].customerID,  // หรือ _id
                 insuranceID: insertedInsurances[0].insuranceID,  // หรือ _id
                 carID:      insertedCars[0].carID, // ตาม schema
+                title: 'ชนคับพี่ช่วยด้วยจัฟ',
                 location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร 10310',
                 detail: 'ชนด้านหน้าจากรถที่วิ่งสวนทาง ความเสียหายบริเวณกันชนหน้า ไฟหน้า และฝากระโปรงหน้า',
+                currentStep: 1,
                 state: 'repair',
                 status: 'new',
                 priorityLevel: 'normal',
                 isClosed: false,
-                incidentDate: '2025-10-20/10:00',
-                estPrice: 25000,
-                approvedPrice: 25000,
-                additionalPrice: 0
+                incidentDate: '2025-10-20 10:00',
+                reportedDate: '2025-10-20 10:02',
             }
         ];
 
         for (const claimData of claimsData) {
             const claim = new Claim(claimData);
             await claim.save(); // ถ้า gen claimID ใน pre('save') ตรงนี้โอเค
-        }
-
-        const claimsHistoryData = [
-            {
-                claimNumber: 'CLM-2025-00001', // ไม่ unique เพราะ 1 claim มีได้หลาย history
-                state: 'open_case',
-                reportedDate:'2025-10-20/10:00'
-            }
-        ];
-
-        for (const claimHistoryData of claimsHistoryData) {
-            const claimHistory = new ClaimHistory(claimHistoryData);
-            await claimHistory.save();
         }
 
         console.log('Data added successfully');

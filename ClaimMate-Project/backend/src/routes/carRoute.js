@@ -1,39 +1,23 @@
-// src/routes/carRoutes.js
-const express = require('express');
+// src/routes/carRoute.js
+const express = require("express");
 const router = express.Router();
-const CarRoute = require('../models/Car');
+const Car = require("../models/Car");
 
-// เพิ่มรถใหม่
-router.post('/create', async (req, res) => {
+// ✅ ดึงรถทั้งหมดของลูกค้า
+router.get("/by-customer/:customerID", async (req, res) => {
     try {
-        const newCar = new CarRoute(req.body);
-        await newCar.save();
-        res.status(201).json(newCar);
-    } catch (err) {
-        console.error('Error creating car:', err);
-        res.status(400).json({ message: err.message });
-    }
-});
+        const customerID = req.params.customerID;
 
-// ดูรถทั้งหมด
-router.get('/all', async (req, res) => {
-    try {
-        const cars = await CarRoute.find().populate('customerID', 'firstName lastName email');
-        res.json(cars);
-    } catch (err) {
-        console.error('Error fetching cars:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+        const cars = await Car.find({ customerID });
 
-// ดูรถเฉพาะของลูกค้าคนหนึ่ง
-router.get('/customer/:customerID', async (req, res) => {
-    try {
-        const cars = await CarRoute.find({ customerID: req.params.customerID });
-        res.json(cars);
+        res.json({
+            success: true,
+            cars
+        });
+
     } catch (err) {
-        console.error('Error fetching customer cars:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
