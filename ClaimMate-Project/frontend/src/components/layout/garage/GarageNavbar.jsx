@@ -177,14 +177,6 @@ const GarageNavbar = ({ garage, onToggleSidebar }) => {
                         <span className="material-icons-round text-neutral-400">account_circle</span>
                         <span className="text-sm text-neutral-dark">ข้อมูลอู่</span>
                       </Link>
-                      <Link
-                        to="/garage/settings"
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors duration-200"
-                        onClick={() => setShowGarageMenu(false)}
-                      >
-                        <span className="material-icons-round text-neutral-400">settings</span>
-                        <span className="text-sm text-neutral-dark">ตั้งค่า</span>
-                      </Link>
                     </div>
                     <div className="border-t border-neutral-200 py-2">
                       <button

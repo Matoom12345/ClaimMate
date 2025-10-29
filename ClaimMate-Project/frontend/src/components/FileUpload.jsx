@@ -422,7 +422,7 @@ const FileUpload = ({
 
                 <div className="flex gap-3 mt-6">
                   <button type="button" onClick={handleSaveEdit} className="btn-primary flex-1" disabled={!editingImage.caption?.trim()}>
-                    <span className="material-icons-round mr-2">check</span>บันทึก
+                    <span className="material-icons-round mr-2">check</span>ยืนยัน
                   </button>
                   <button type="button" onClick={() => handleRemoveFile(files.findIndex(f => f.id === editingImage.id))} className="px-4 py-2 border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white rounded-lg">
                     <span className="material-icons-round">delete</span>

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
+import UserProfile from './pages/UserProfile';
 
 // Pages
 import Login from './pages/Login';
@@ -46,7 +47,7 @@ import GarageRepairDetail from './pages/garage/GarageRepairDetail';
  * ✅ /insurance/* → Insurance Portal (Protected)
  * ✅ /garage/* → Garage Portal (Protected)
  * 
- * 🔐 All routes except /login are protected by ProtectedRoute
+ * 🔒 All routes except /login are protected by ProtectedRoute
  * 
  * TODO: Backend Integration
  * - Replace localStorage authentication with JWT tokens
@@ -90,6 +91,9 @@ function App() {
           {/* Complaint - แจ้งร้องเรียน */}
           <Route path="complaint" element={<Complaint />} />
           
+          {/* User Profile - ข้อมูลผู้ใช้ */}
+          <Route path="profile" element={<UserProfile />} />
+          
           {/* Default redirect */}
           <Route index element={<Navigate to="/customer/dashboard" replace />} />
         </Route>
@@ -121,6 +125,9 @@ function App() {
           {/* Analytics - วิเคราะห์และรายงาน */}
           <Route path="analytics" element={<Analytics />} />
           
+          {/* User Profile - ข้อมูลผู้ใช้ */}
+          <Route path="profile" element={<UserProfile />} />
+          
           {/* Default redirect */}
           <Route index element={<Navigate to="/insurance/claims/active" replace />} />
         </Route>
@@ -149,6 +156,9 @@ function App() {
           
           {/* History - ประวัติการซ่อม */}
           <Route path="history" element={<GarageHistory />} />
+          
+          {/* User Profile - ข้อมูลผู้ใช้ */}
+          <Route path="profile" element={<UserProfile />} />
         </Route>
 
         {/* ==================== 404 NOT FOUND ==================== */}

@@ -22,7 +22,6 @@ dotenv.config();
             Car.deleteMany({}),
             User.deleteMany({}),
             Counter.deleteMany({}),
-            ClaimHistory.deleteMany({})
         ]);
         console.log('Cleared old data');
 
@@ -72,7 +71,7 @@ dotenv.config();
                 insuranceLevel: 1, insuranceBalance: 100000
             },
             {
-                customerID: insertedCustomers[1].customerID,
+                customerID: insertedCustomers[0].customerID,
                 brand: 'Honda', model: 'Civic', year: '2020',
                 licensePlate: 'ขง 5678', color: 'Black',
                 engineID: 'ENG-002', policyNumber: 'POL-002',

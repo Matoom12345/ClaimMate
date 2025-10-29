@@ -167,13 +167,6 @@ const CustomerNavbar = ({ user, onToggleSidebar }) => {
                         <span className="material-icons-round text-neutral-400">person</span>
                         <span className="text-sm text-neutral-dark">โปรไฟล์</span>
                       </Link>
-                      <Link
-                        to="/customer/settings"
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors duration-200"
-                      >
-                        <span className="material-icons-round text-neutral-400">settings</span>
-                        <span className="text-sm text-neutral-dark">ตั้งค่า</span>
-                      </Link>
                     </div>
                     <div className="border-t border-neutral-200 py-2">
                       <button

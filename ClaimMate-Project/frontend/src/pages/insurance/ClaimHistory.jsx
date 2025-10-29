@@ -1,31 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { StatusBadge } from '../../components';
 
 /**
- * ClaimHistory - หน้าประวัติการเคลมทั้งหมด
+ * ClaimHistory - หน้าประวัติการเคลมที่เสร็จสิ้นแล้ว
  * 
  * จุดประสงค์:
- * - ดูประวัติเคลมที่เสร็จสิ้นหรือยกเลิกแล้ว
+ * - ดูประวัติเคลมที่เสร็จสิ้นเท่านั้น
  * - ค้นหาและ filter เคลม
  * - Export รายงาน
- * 
- * TODO: Backend Integration
- * - GET /api/insurance/claims/history?page={page}&status={status} - ดึงประวัติเคลม
+ * - แสดงสถิติและข้อมูลที่น่าสนใจ
  */
 const ClaimHistory = () => {
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState([]);
-  const [filterStatus, setFilterStatus] = useState('all');
   const [filterMonth, setFilterMonth] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  const statusFilters = [
-    { value: 'all', label: 'ทั้งหมด' },
-    { value: 'completed', label: 'เสร็จสิ้น' },
-    { value: 'cancelled', label: 'ยกเลิก' },
-    { value: 'rejected', label: 'ไม่อนุมัติ' },
-  ];
 
   const monthFilters = [
     { value: 'all', label: 'ทุกเดือน' },
@@ -35,16 +24,12 @@ const ClaimHistory = () => {
   ];
 
   useEffect(() => {
-    // TODO: Backend - ดึงประวัติเคลม
-    // fetchClaimHistory();
-    
-    // Mock data
+    // TODO: Backend - ดึงประวัติเคลมที่เสร็จสิ้นแล้ว
     setTimeout(() => {
       setClaims([
         {
           id: '10',
           claimNumber: 'CLM-2024-010',
-          status: 'completed',
           customerName: 'นายสมชาย ใจดี',
           carModel: 'Honda City',
           licensePlate: 'กข 1234 กรุงเทพ',
@@ -52,12 +37,12 @@ const ClaimHistory = () => {
           completedDate: '2024-10-28',
           estimatedCost: 25000,
           approvedAmount: 25000,
+          satisfaction: 5,
           assignedOfficer: 'นางสาววิภา ประกันภัย',
         },
         {
           id: '9',
           claimNumber: 'CLM-2024-009',
-          status: 'completed',
           customerName: 'นางสุดา รักษ์ดี',
           carModel: 'Toyota Yaris',
           licensePlate: 'คง 5678 กรุงเทพ',
@@ -65,25 +50,25 @@ const ClaimHistory = () => {
           completedDate: '2024-10-22',
           estimatedCost: 15000,
           approvedAmount: 15000,
+          satisfaction: 4,
           assignedOfficer: 'นายสมชาย ตรวจสอบ',
         },
         {
           id: '8',
           claimNumber: 'CLM-2024-008',
-          status: 'cancelled',
           customerName: 'นายประเสริฐ มั่นคง',
           carModel: 'Mazda CX-5',
           licensePlate: 'งง 9999 กรุงเทพ',
           incidentDate: '2024-09-28',
-          completedDate: '2024-09-30',
+          completedDate: '2024-10-08',
           estimatedCost: 32000,
-          approvedAmount: 0,
+          approvedAmount: 30000,
+          satisfaction: 3,
           assignedOfficer: 'นางสาววิภา ประกันภัย',
         },
         {
           id: '7',
           claimNumber: 'CLM-2024-007',
-          status: 'completed',
           customerName: 'นางวิมล สุขสันต์',
           carModel: 'Honda CR-V',
           licensePlate: 'ฮฮ 7777 กรุงเทพ',
@@ -91,19 +76,20 @@ const ClaimHistory = () => {
           completedDate: '2024-09-18',
           estimatedCost: 48000,
           approvedAmount: 45000,
+          satisfaction: 5,
           assignedOfficer: 'นางสุดา รายงาน',
         },
         {
           id: '6',
           claimNumber: 'CLM-2024-006',
-          status: 'rejected',
           customerName: 'นายเจริญ พัฒนา',
           carModel: 'Toyota Fortuner',
           licensePlate: 'จจ 1111 กรุงเทพ',
           incidentDate: '2024-08-20',
-          completedDate: '2024-08-22',
-          estimatedCost: 80000,
-          approvedAmount: 0,
+          completedDate: '2024-09-05',
+          estimatedCost: 55000,
+          approvedAmount: 52000,
+          satisfaction: 4,
           assignedOfficer: 'นายสมชาย ตรวจสอบ',
         },
       ]);
@@ -113,11 +99,6 @@ const ClaimHistory = () => {
 
   // Filter claims
   const filteredClaims = claims.filter(claim => {
-    // Filter by status
-    if (filterStatus !== 'all' && claim.status !== filterStatus) {
-      return false;
-    }
-    
     // Filter by month
     if (filterMonth !== 'all') {
       const claimMonth = claim.incidentDate.substring(0, 7);
@@ -139,13 +120,34 @@ const ClaimHistory = () => {
     return true;
   });
 
-  const getStatusConfig = (status) => {
-    const config = {
-      completed: { label: 'เสร็จสิ้น', variant: 'success', icon: 'check_circle' },
-      cancelled: { label: 'ยกเลิก', variant: 'neutral', icon: 'cancel' },
-      rejected: { label: 'ไม่อนุมัติ', variant: 'error', icon: 'block' },
-    };
-    return config[status] || config.completed;
+  // Calculate statistics
+  const stats = {
+    totalClaims: filteredClaims.length,
+    totalAmount: filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0),
+    averageSatisfaction: filteredClaims.length > 0 
+      ? (filteredClaims.reduce((sum, claim) => sum + claim.satisfaction, 0) / filteredClaims.length).toFixed(1)
+      : 0,
+    averageAmount: filteredClaims.length > 0
+      ? Math.round(filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0) / filteredClaims.length)
+      : 0,
+  };
+
+  // Render satisfaction stars
+  const renderStars = (rating) => {
+    return (
+      <div className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span
+            key={star}
+            className={`material-icons-round text-base ${
+              star <= rating ? 'text-yellow-400' : 'text-neutral-300'
+            }`}
+          >
+            star
+          </span>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -168,13 +170,85 @@ const ClaimHistory = () => {
             ประวัติการเคลม
           </h1>
           <p className="text-neutral-500">
-            เคลมที่เสร็จสิ้นหรือปิดไปแล้ว - {filteredClaims.length} รายการ
+            เคลมที่เสร็จสิ้นแล้ว - ทั้งหมด {claims.length} รายการ
           </p>
         </div>
         <button className="btn-outline flex items-center gap-2">
           <span className="material-icons-round">file_download</span>
           <span>Export รายงาน</span>
         </button>
+      </div>
+
+      {/* 📊 Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Total Claims */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-neutral-500 text-sm mb-1">เคลมทั้งหมด</p>
+              <p className="text-3xl font-bold text-neutral-dark">{stats.totalClaims}</p>
+              <p className="text-neutral-400 text-xs mt-1">รายการ</p>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <span className="material-icons-round text-2xl text-primary-600">description</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Amount */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-neutral-500 text-sm mb-1">ค่าซ่อมรวม</p>
+              <p className="text-3xl font-bold text-neutral-dark">฿{(stats.totalAmount / 1000000).toFixed(1)}M</p>
+              <p className="text-neutral-400 text-xs mt-1">
+                เฉลี่ย ฿{(stats.averageAmount / 1000).toFixed(0)}K
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <span className="material-icons-round text-2xl text-primary-600">payments</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Average Satisfaction */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-neutral-500 text-sm mb-1">ความพึงพอใจ</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-bold text-neutral-dark">{stats.averageSatisfaction}</p>
+                <p className="text-neutral-400 text-sm">/5.0</p>
+              </div>
+              <div className="flex gap-0.5 mt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span key={star} className="material-icons-round text-xs text-yellow-400">
+                    star
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <span className="material-icons-round text-2xl text-primary-600">sentiment_satisfied</span>
+            </div>
+          </div>
+        </div>
+
+        {/* This Month */}
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-neutral-500 text-sm mb-1">เดือนนี้</p>
+              <p className="text-3xl font-bold text-neutral-dark">
+                {claims.filter(c => c.completedDate.startsWith('2024-10')).length}
+              </p>
+              <p className="text-neutral-400 text-xs mt-1">รายการ</p>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <span className="material-icons-round text-2xl text-primary-600">event_available</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -200,7 +274,7 @@ const ClaimHistory = () => {
           <select
             value={filterMonth}
             onChange={(e) => setFilterMonth(e.target.value)}
-            className="input-field lg:w-56"
+            className="input-field lg:w-64"
           >
             {monthFilters.map(filter => (
               <option key={filter.value} value={filter.value}>
@@ -208,107 +282,125 @@ const ClaimHistory = () => {
               </option>
             ))}
           </select>
-
-          {/* Status Filter */}
-          <div className="flex gap-2 overflow-x-auto">
-            {statusFilters.map(filter => (
-              <button
-                key={filter.value}
-                onClick={() => setFilterStatus(filter.value)}
-                className={`
-                  px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300
-                  ${filterStatus === filter.value
-                    ? 'bg-primary-500 text-white shadow-button'
-                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                  }
-                `}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* Claims Table */}
       {filteredClaims.length === 0 ? (
         <div className="card-static text-center py-16">
-          <span className="material-icons-round text-6xl text-neutral-300 mb-4">
-            search_off
-          </span>
-          <p className="text-neutral-500 text-lg mb-2">
+          <div className="w-24 h-24 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="material-icons-round text-6xl text-neutral-300">
+              search_off
+            </span>
+          </div>
+          <p className="text-neutral-600 text-lg font-medium mb-2">
             ไม่พบประวัติการเคลม
           </p>
           <p className="text-neutral-400 text-sm">
-            ลองเปลี่ยนคำค้นหาหรือตัวกรอง
+            ลองเปลี่ยนคำค้นหาหรือเลือกเดือนอื่น
           </p>
         </div>
       ) : (
         <div className="card-static overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">เลขเคลม</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">ลูกค้า</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">รถยนต์</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">วันเกิดเหตุ</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">วันเสร็จสิ้น</th>
-                <th className="text-right py-3 px-4 font-semibold text-neutral-700">ค่าซ่อม</th>
-                <th className="text-center py-3 px-4 font-semibold text-neutral-700">สถานะ</th>
-                <th className="text-center py-3 px-4 font-semibold text-neutral-700">การดำเนินการ</th>
+              <tr className="border-b-2 border-neutral-200">
+                <th className="text-left py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-round text-neutral-400 text-lg">receipt_long</span>
+                    <span>เลขเคลม</span>
+                  </div>
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-round text-neutral-400 text-lg">person</span>
+                    <span>ลูกค้า</span>
+                  </div>
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-round text-neutral-400 text-lg">directions_car</span>
+                    <span>รถยนต์</span>
+                  </div>
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-round text-neutral-400 text-lg">event</span>
+                    <span>วันที่</span>
+                  </div>
+                </th>
+                <th className="text-right py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="material-icons-round text-neutral-400 text-lg">payments</span>
+                    <span>ค่าซ่อม</span>
+                  </div>
+                </th>
+                <th className="text-center py-4 px-4 font-semibold text-neutral-700">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-icons-round text-yellow-400 text-lg">star</span>
+                    <span>ความพึงพอใจ</span>
+                  </div>
+                </th>
+                <th className="text-center py-4 px-4 font-semibold text-neutral-700">
+                  การดำเนินการ
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredClaims.map(claim => {
-                const statusConfig = getStatusConfig(claim.status);
-                
-                return (
-                  <tr key={claim.id} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors duration-200">
-                    <td className="py-4 px-4">
-                      <p className="font-semibold text-neutral-dark">{claim.claimNumber}</p>
-                      <p className="text-xs text-neutral-500">{claim.assignedOfficer}</p>
-                    </td>
-                    <td className="py-4 px-4">
-                      <p className="font-medium text-neutral-dark">{claim.customerName}</p>
-                    </td>
-                    <td className="py-4 px-4">
+              {filteredClaims.map((claim, index) => (
+                <tr 
+                  key={claim.id} 
+                  className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors duration-200"
+                >
+                  <td className="py-4 px-4">
+                    <p className="font-bold text-primary-600">{claim.claimNumber}</p>
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {claim.assignedOfficer}
+                    </p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <p className="font-medium text-neutral-dark">{claim.customerName}</p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div>
                       <p className="font-medium text-neutral-dark">{claim.carModel}</p>
-                      <p className="text-xs text-neutral-500">{claim.licensePlate}</p>
-                    </td>
-                    <td className="py-4 px-4 text-sm text-neutral-600">
-                      {claim.incidentDate}
-                    </td>
-                    <td className="py-4 px-4 text-sm text-neutral-600">
-                      {claim.completedDate}
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <p className="font-semibold text-neutral-dark">
-                        ฿{claim.estimatedCost.toLocaleString()}
+                      <p className="text-sm text-neutral-500">{claim.licensePlate}</p>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-neutral-600">
+                        <span className="text-xs text-neutral-400">เกิดเหตุ:</span> {claim.incidentDate}
                       </p>
-                      {claim.approvedAmount > 0 && (
-                        <p className="text-xs text-success">
-                          อนุมัติ ฿{claim.approvedAmount.toLocaleString()}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`badge badge-${statusConfig.variant} inline-flex items-center gap-1`}>
-                        <span className="material-icons-round text-xs">{statusConfig.icon}</span>
-                        {statusConfig.label}
+                      <p className="text-sm text-neutral-600">
+                        <span className="text-xs text-neutral-400">เสร็จ:</span> {claim.completedDate}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <p className="font-bold text-neutral-dark text-lg">
+                      ฿{claim.approvedAmount.toLocaleString()}
+                    </p>
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="flex flex-col items-center gap-1">
+                      {renderStars(claim.satisfaction)}
+                      <span className="text-xs font-medium text-neutral-600">
+                        {claim.satisfaction}.0/5.0
                       </span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <Link
-                        to={`/insurance/claims/${claim.id}`}
-                        className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
-                      >
-                        <span className="material-icons-round text-sm">visibility</span>
-                        <span>ดูรายละเอียด</span>
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <Link
+                      to={`/insurance/claims/${claim.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium text-sm transition-all duration-300 hover:shadow-button"
+                    >
+                      <span className="material-icons-round text-sm">visibility</span>
+                      <span>ดูรายละเอียด</span>
+                    </Link>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

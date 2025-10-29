@@ -64,7 +64,7 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
               <div className="flex items-center gap-2">
                 <span className="material-icons-round text-warning text-sm">pending</span>
                 <div className="text-left">
-                  <p className="text-xs text-neutral-500">รอดำเนินการ</p>
+                  <p className="text-xs text-neutral-500">รออนุมัติ</p>
                   <p className="text-sm font-semibold text-neutral-dark">12</p>
                 </div>
               </div>
@@ -72,7 +72,7 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
               <div className="flex items-center gap-2">
                 <span className="material-icons-round text-primary-500 text-sm">assignment</span>
                 <div className="text-left">
-                  <p className="text-xs text-neutral-500">วันนี้</p>
+                  <p className="text-xs text-neutral-500">กำลังดำเนินการ</p>
                   <p className="text-sm font-semibold text-neutral-dark">8</p>
                 </div>
               </div>
@@ -176,27 +176,25 @@ const InsuranceNavbar = ({ user, onToggleSidebar }) => {
                     onClick={() => setShowUserMenu(false)}
                   ></div>
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-card-hover border border-neutral-200 overflow-hidden z-40 animate-scale-in">
+                    {/* User Info */}
                     <div className="p-4 border-b border-neutral-200">
                       <p className="font-semibold text-neutral-dark">{user?.firstName + " " +user?.lastName || 'ผู้ใช้'}</p>
-                      <p className="text-sm text-neutral-500">{user?.email || 'user@example.com'}</p>
-                      <p className="text-xs text-neutral-400 mt-1">{user?.position || 'เจ้าหน้าที่'}</p>
+                      <p className="text-sm text-neutral-500 mt-1">{user?.email || 'user@example.com'}</p>
                     </div>
+
+                    {/* Menu Items */}
                     <div className="py-2">
                       <Link
                         to="/insurance/profile"
+                        onClick={() => setShowUserMenu(false)}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors duration-200"
                       >
                         <span className="material-icons-round text-neutral-400">person</span>
-                        <span className="text-sm text-neutral-dark">โปรไฟล์</span>
-                      </Link>
-                      <Link
-                        to="/insurance/settings"
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors duration-200"
-                      >
-                        <span className="material-icons-round text-neutral-400">settings</span>
-                        <span className="text-sm text-neutral-dark">ตั้งค่า</span>
+                        <span className="text-sm text-neutral-dark">ข้อมูลผู้ใช้</span>
                       </Link>
                     </div>
+
+                    {/* Logout */}
                     <div className="border-t border-neutral-200 py-2">
                       <button
                         onClick={handleLogout}
