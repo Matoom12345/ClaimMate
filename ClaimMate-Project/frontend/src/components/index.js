@@ -17,6 +17,7 @@ export { default as Loading, Skeleton, SkeletonCard, SkeletonTable, SkeletonTime
 // Form Components
 export { default as FileUpload } from './FileUpload';
 
+export { default as OTPInput } from './OTPInput';
 // Usage Examples:
 // import { Button, Card, Badge } from '@/components/common';
 // import { ClaimTimeline } from '@/components/common';
