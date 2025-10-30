@@ -791,16 +791,20 @@ router.post("/save/:claimNumber", async (req, res) => {
         console.log("[SAVE] 3. Claim details SAVED.");
 
         // ✅ 2A) สร้างรูปใหม่ (Upload to Cloudinary)
-        console.log(`[SAVE] 4. Processing ${photosToCreate.length} new photos...`);
+        console.log(`[SAVE] 4. Processing ${photosToCreate.length} new photos...`); // <--- (Log ที่คุณเห็น)
         for (const p of photosToCreate) {
-            console.log(`[SAVE] 4A. Uploading temp file: ${p.tempFileName}`);
+
+            // ⭐️⭐️⭐️ เพิ่ม 2 บรรทัดนี้ ⭐️⭐️⭐️
+            console.log(`[SAVE DEBUG] 4A. Uploading to Cloudinary: ${p.tempFileName}`);
             const tempFilePath = path.join(tempDir, p.tempFileName);
 
             const result = await cloudinary.uploader.upload(
                 tempFilePath,
                 { folder: `claims/${claimNumber}` }
             );
-            console.log(`[SAVE] 4B. Cloudinary SUCCESS. URL: ${result.secure_url}`);
+
+            // ⭐️⭐️⭐️ เพิ่ม 1 บรรทัดนี้ ⭐️⭐️⭐️
+            console.log(`[SAVE DEBUG] 4B. Creating AccidentPhoto in DB...`);
 
             await AccidentPhoto.create({
                 claimNumber,
@@ -808,7 +812,9 @@ router.post("/save/:claimNumber", async (req, res) => {
                 caption: p.caption,
                 photoURL: result.secure_url
             });
-            console.log("[SAVE] 4C. AccidentPhoto DB SAVED.");
+
+            // ⭐️⭐️⭐️ เพิ่ม 1 บรรทัดนี้ ⭐️⭐️⭐️
+            console.log(`[SAVE DEBUG] 4C. DB Create Done. Deleting temp file...`);
 
             try {
                 fs.unlinkSync(tempFilePath);
