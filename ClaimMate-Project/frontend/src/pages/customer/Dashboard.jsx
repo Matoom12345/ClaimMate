@@ -9,15 +9,16 @@ const CustomerDashboard = () => {
   const [activeClaims, setActiveClaims] = useState([]);
 
   useEffect(() => {
-    loadDashboardData();
+    (async () => {
+      await loadDashboardData();
+    })();
   }, []);
-
   const loadDashboardData = async () => {
     try {
       const user = JSON.parse(localStorage.getItem("claimmate_user"));
       if (!user) return;
 
-      const customerID = user.id;
+      const customerID = user.customerID;
 
       // ✅ 1) ดึงสถิติ (total, ongoing, completed)
       const statRes = await axios.get(
@@ -36,15 +37,17 @@ const CustomerDashboard = () => {
 
       // ✅ Mapping สำหรับ UI
       const mappedActive = activeList.map((c) => ({
-        id: c._id || c.id,
+        id: c._id,                  // ✅ FIX
         claimNumber: c.claimNumber,
         title: c.title,
-        date: c.incidentDate?.split("/")[0] || "",
+        date: c.incidentDate,       // ✅ FIX
         currentStep: c.currentStep || 1,
         status: c.state,
         estimatedCost: c.estimatedCost || 0,
         garage: c.garageName || null,
         carModel: c.carModel || "",
+        carBrand: c.carBrand || "",
+        carYear: c.carYear || "",
         licensePlate: c.licensePlate || "",
       }));
 
@@ -174,7 +177,7 @@ const CustomerDashboard = () => {
                         <span className="material-icons-round text-sm">
                           directions_car
                         </span>
-                              {claim.carModel}
+                              {claim.carBrand + " " + claim.carModel + " (" + claim.carYear + ")"}
                       </span>
 
                             <span className="flex items-center gap-1">

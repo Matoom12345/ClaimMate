@@ -33,9 +33,9 @@ const ClaimDetail = () => {
         brand: c.carBrand || "",
         model: c.carModel || "",
         color: c.carColor || "",
-        year: c.Year,
+        year: c.carYear,
         licensePlate: c.licensePlate || "",
-        chassisNumber: c.chassisNumber || "",
+        chassisNumber: c.engineID || "",
       };
 
       // ✅ garage object (ถ้ามี)

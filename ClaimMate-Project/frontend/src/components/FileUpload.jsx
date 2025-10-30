@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 /**
  * FileUpload Component - อัปโหลดไฟล์พร้อม drag & drop
- * 
+ *
  * @param {boolean} withDetails - เปิดโหมดอัปโหลดพร้อมรายละเอียด (caption + type)
  * @param {string} label - ป้ายชื่อ
  * @param {function} onChange - ฟังก์ชันเมื่อเลือกไฟล์
@@ -15,6 +15,9 @@ import PropTypes from 'prop-types';
  * @param {boolean} disabled - ปิดการใช้งาน
  * @param {boolean} showPreview - แสดง preview รูปภาพหรือไม่
  * @param {string} className - class เพิ่มเติม
+ * @param name
+ * @param onRemove
+ * @param onUpdateFiles
  */
 const FileUpload = ({
   withDetails = false, // ⭐ NEW: โหมดอัปโหลดพร้อมรายละเอียด
@@ -28,7 +31,9 @@ const FileUpload = ({
   disabled = false,
   showPreview = true,
   className = '',
-  name = '',
+                      name = '',
+                      onRemove = null,
+                      onUpdateFiles = null, // <-- ✅ เพิ่มบรรทัดนี้
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [editingImage, setEditingImage] = useState(null);
@@ -141,30 +146,47 @@ const FileUpload = ({
     }
 
     const updatedFiles = files.map(file =>
-      file.id === editingImage.id ? editingImage : file
+        file.id === editingImage.id ? editingImage : file
     );
-    onChange({ target: { name, files: updatedFiles, error: '' } });
-    
-    // หา file ถัดไปที่ยังไม่มี caption
-    const nextFile = files.find(file => 
-      file.id !== editingImage.id && !file.caption.trim()
+
+    // --- ✅ START FIX ---
+    if (onUpdateFiles) {
+      // เรียก setImages ใน ClaimDetail โดยตรง
+      onUpdateFiles(updatedFiles);
+    } else {
+      // Fallback (ถ้าหน้าอื่นเอาไปใช้)
+      onChange({ target: { name, files: updatedFiles, error: '' } });
+    }
+    // --- ✅ END FIX ---
+
+    // หา file ถัดไปที่ยังไม่มี caption (ใช้ updatedFiles ตัวแปรล่าสุด)
+    const nextFile = updatedFiles.find(file =>
+        file.id !== editingImage.id && !file.caption?.trim()
     );
-    
+
     if (nextFile) {
       setEditingImage({ ...nextFile });
     } else {
-      setShowEditModal(false);
+      setShowEditModal(false); // ✅ บรรทัดนี้จะทำงานได้ถูกต้องแล้ว
       setEditingImage(null);
     }
   };
 
   // Handle remove file
   const handleRemoveFile = (index) => {
-    const newFiles = files.filter((_, i) => i !== index);
-    onChange({ target: { name, files: newFiles, error: '' } });
-    
+    const fileToRemove = files[index]; // ดึง object ที่จะลบออกมาก่อน
+
+    if (onRemove) {
+      // ถ้ามี prop onRemove (จาก ClaimDetail) ให้เรียกใช้ตัวนั้น
+      onRemove(fileToRemove);
+    } else {
+      // ถ้าไม่มี (เช่น หน้ารอื่นใช้) ให้ใช้พฤติกรรมเดิม
+      const newFiles = files.filter((_, i) => i !== index);
+      onChange({ target: { name, files: newFiles, error: '' } });
+    }
+
     // ปิด modal ถ้ากำลังแก้ไขไฟล์นี้อยู่
-    if (editingImage && editingImage.id === files[index].id) {
+    if (editingImage && editingImage.id === fileToRemove.id) {
       setShowEditModal(false);
       setEditingImage(null);
     }
@@ -226,7 +248,7 @@ const FileUpload = ({
             <div className="w-20 h-20 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
               <span className="material-icons-round text-4xl text-primary-500">cloud_upload</span>
             </div>
-            
+
             <div>
               <p className="text-lg font-semibold text-neutral-dark mb-2">
                 ลากและวางไฟล์ หรือคลิกเพื่อเลือกไฟล์
@@ -234,7 +256,14 @@ const FileUpload = ({
               <p className="text-sm text-neutral-500 mb-4">
                 รองรับไฟล์ image/* (สูงสุด 20 รูป)
               </p>
-              <button type="button" onClick={handleClick} className="btn-primary">
+              <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation(); // <-- ✅ เพิ่มบรรทัดนี้เพื่อหยุด Event
+                    handleClick();
+                  }}
+                  className="btn-primary"
+              >
                 <span className="material-icons-round mr-2">photo_library</span>
                 เลือกรูปภาพ
               </button>

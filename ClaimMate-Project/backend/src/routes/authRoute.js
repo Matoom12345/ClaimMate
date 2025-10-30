@@ -57,6 +57,8 @@ router.post('/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
 
     const user = await User.findOne({ email });
+    console.log("USER KEYS ===> ", Object.keys(user._doc));
+    console.log("🟡 VERIFY USER FROM DB ===>", user);
 
     if (!user || user.otp !== otp || user.otpExpires < new Date()) {
         return res.status(400).json({ success: false, message: 'รหัส OTP ไม่ถูกต้อง' });
@@ -67,26 +69,32 @@ router.post('/verify-otp', async (req, res) => {
     user.otpExpires = null;
     await user.save();
 
-    // ✅ ส่งข้อมูลกลับ
+    // ✅ แปลง document -> plain object (สำคัญมาก)
+    const data = user.toObject();
+    console.log("✅ REAL DATA ===>", data);
+
+    // ✅ ส่งข้อมูลกลับ (อ่านจาก data แทน user)
     let output = {
-        role: user.role.toLowerCase(),        // ✅ แปลง role เป็น lowercase
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        role: data.role.toLowerCase(),
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
     };
 
     if (output.role === 'customer') {
-        output.id = user.customerID;
+        output.customerID = data.customerID;
     }
     else if (output.role === 'insurance') {
-        output.id = user.insuranceID;
-        output.position = user.position;
+        output.insuranceID = data.insuranceID; // ✅ ตอนนี้มีชัวร์
+        output.position = data.position;
     }
     else if (output.role === 'garage') {
-        output.id = user.garageID;
-        output.garageName = user.garageName;
+        output.garageID = data.garageID;
+        output.garageName = data.garageName;
     }
 
+    console.log("✅ OUTPUT SENT:", output);
     return res.json({ success: true, user: output });
 });
 

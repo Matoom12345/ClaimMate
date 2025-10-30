@@ -16,11 +16,11 @@ const CustomerSidebar = ({ collapsed = false }) => {
   useEffect(() => {
     const fetchStats = async () => {
       const user = JSON.parse(localStorage.getItem("claimmate_user"));
-      if (!user?.id) return;
+      if (!user?.customerID) return;
 
       try {
         const res = await axios.get(
-            `http://localhost:3000/api/claims/customer/${user.id}/stats`
+            `http://localhost:3000/api/claims/customer/${user.customerID}/stats`
         );
         if (res.data.success) {
           setStats(res.data.stats);

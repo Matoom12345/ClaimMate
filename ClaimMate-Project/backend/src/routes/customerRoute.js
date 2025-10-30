@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Customer = require('../models/Customer');
+const upload = require('../middleware/upload');        // ชี้ไปไฟล์ upload.js
+const AccidentPhoto = require('../models/AccidentPhoto');
 
 // ดึงลูกค้าทั้งหมด
 router.get('/', async (req, res) => {

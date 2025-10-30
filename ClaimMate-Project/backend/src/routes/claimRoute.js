@@ -1,62 +1,135 @@
-// src/routes/claimRoutes.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Claim = require('../models/Claim');
 
-/* ────────────────────────────────────────────────
-   ✅ เปิดเคสใหม่
-──────────────────────────────────────────────────*/
-router.post('/create', async (req, res) => {
-    try {
-        const claim = new Claim(req.body);
-        await claim.save();
-        res.status(201).json(claim);
-    } catch (err) {
-        console.error('Error creating claim:', err);
-        res.status(400).json({ message: err.message });
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
+
+// ✅ ensure temp folder exists
+const tempDir = path.join(__dirname, "../../tempUploads");
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+}
+
+// ✅ temp storage
+const tempStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, tempDir);
+    },
+    filename: (req, file, cb) => {
+        const unique = "temp_" + Date.now() + "_" + file.originalname;
+        cb(null, unique);
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ ดึงเคสทั้งหมด (insurance/admin)
-──────────────────────────────────────────────────*/
-router.get('/all', async (req, res) => {
+// ✅ middleware
+const uploadTemp = multer({ storage: tempStorage });
+
+const Claim = require("../models/Claim");
+const RepairItem = require("../models/RepairItem");
+const AccidentPhoto = require("../models/AccidentPhoto");
+
+const upload = require("../middlewares/upload");
+const cloudinary = require("../config/cloudinary");
+
+
+
+/* =====================================================
+   ✅ 1) เปิดเคสใหม่
+===================================================== */
+router.post("/", async (req, res) => {
+    try {
+        const {
+            customerID,
+            insuranceID,
+            carID,
+            title,
+            location,
+            detail,
+            priorityLevel,
+            incidentDate,
+            reportedDate
+        } = req.body;
+
+        // ตรวจข้อมูล
+        if (!customerID || !insuranceID || !carID || !title || !location || !detail) {
+            return res.status(400).json({ success: false, message: "ข้อมูลไม่ครบ" });
+        }
+
+        // เช็คเคสเปิดของรถคันนี้
+        const existingOpenClaim = await Claim.findOne({
+            carID,
+            isClosed: false
+        });
+
+        if (existingOpenClaim) {
+            return res.status(400).json({
+                success: false,
+                message: `รถคันนี้มีเคสเปิดอยู่แล้ว (${existingOpenClaim.claimNumber})`
+            });
+        }
+
+        // ✅ create claim (Claim model gen claimNumber อัตโนมัติ)
+        const claim = await Claim.create({
+            customerID,
+            insuranceID,
+            carID,
+            title,
+            location,
+            detail,
+            priorityLevel,
+            incidentDate,
+            reportedDate,
+            status: "new",
+            state: "open_case",
+            currentStep: 1,
+            isClosed: false
+        });
+
+        return res.json({ success: true, claim });
+
+    } catch (error) {
+        console.error("CREATE CLAIM ERROR:", error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/* =====================================================
+   ✅ 2) ดึงเคสทั้งหมด (insurance/admin)
+===================================================== */
+router.get("/all", async (req, res) => {
     try {
         const docs = await Claim.aggregate([
-            /* Customer */
             {
                 $lookup: {
-                    from: 'users',
-                    localField: 'customerID',
-                    foreignField: 'customerID',
-                    as: 'customer'
+                    from: "users",
+                    localField: "customerID",
+                    foreignField: "customerID",
+                    as: "customer"
                 }
             },
-            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
 
-            /* Insurance */
             {
                 $lookup: {
-                    from: 'users',
-                    localField: 'insuranceID',
-                    foreignField: 'insuranceID',
-                    as: 'insurance'
+                    from: "users",
+                    localField: "insuranceID",
+                    foreignField: "insuranceID",
+                    as: "insurance"
                 }
             },
-            { $unwind: { path: '$insurance', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: "$insurance", preserveNullAndEmptyArrays: true } },
 
-            /* Car */
             {
                 $lookup: {
-                    from: 'cars',
-                    localField: 'carID',
-                    foreignField: 'carID',
-                    as: 'car'
+                    from: "cars",
+                    localField: "carID",
+                    foreignField: "carID",
+                    as: "car"
                 }
             },
-            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: "$car", preserveNullAndEmptyArrays: true } },
 
-            /* Garage */
             {
                 $lookup: {
                     from: "users",
@@ -70,7 +143,6 @@ router.get('/all', async (req, res) => {
             },
             { $unwind: { path: "$garage", preserveNullAndEmptyArrays: true } },
 
-            /* PROJECT */
             {
                 $project: {
                     id: "$_id",
@@ -78,7 +150,6 @@ router.get('/all', async (req, res) => {
                     title: 1,
                     detail: 1,
                     location: 1,
-
                     state: 1,
                     status: 1,
                     currentStep: 1,
@@ -97,76 +168,78 @@ router.get('/all', async (req, res) => {
                     approvedCost: 1,
                     additionalCost: 1,
 
-                    /* Customer */
                     customerID: 1,
                     customerName: {
                         $concat: [
-                            { $ifNull: ['$customer.firstName', ''] }, ' ',
-                            { $ifNull: ['$customer.lastName', ''] }
+                            { $ifNull: ["$customer.firstName", ""] },
+                            " ",
+                            { $ifNull: ["$customer.lastName", ""] }
                         ]
                     },
-                    customerPhone: '$customer.phoneNumber',
+                    customerPhone: "$customer.phoneNumber",
 
-                    /* Insurance */
                     insuranceName: {
                         $concat: [
-                            { $ifNull: ['$insurance.firstName', ''] }, ' ',
-                            { $ifNull: ['$insurance.lastName', ''] }
+                            { $ifNull: ["$insurance.firstName", ""] },
+                            " ",
+                            { $ifNull: ["$insurance.lastName", ""] }
                         ]
                     },
 
-                    /* Car */
-                    carBrand: '$car.brand',
-                    carModel: '$car.model',
-                    licensePlate: '$car.licensePlate',
+                    carBrand: "$car.brand",
+                    carModel: "$car.model",
+                    carYear: "$car.year",
+                    licensePlate: "$car.licensePlate",
+                    carColor: "$car.color",
+                    engineID: "$car.engineID",
+                    policyNumber: "$car.policyNumber",
 
-                    /* Garage */
-                    garageName: '$garage.garageName',
-                    garagePhone: '$garage.phoneNumber',
-                    garageEmail: '$garage.email'
+                    garageName: "$garage.garageName",
+                    garagePhone: "$garage.phoneNumber",
+                    garageEmail: "$garage.email"
                 }
             }
         ]);
 
         res.json(docs);
+
     } catch (err) {
-        console.error('Error fetching claims:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error fetching claims:", err);
+        res.status(500).json({ message: "Server error" });
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ Active Claims ของ Insurance
-──────────────────────────────────────────────────*/
-router.get('/active', async (req, res) => {
+/* =====================================================
+   ✅ 3) Active Claims
+===================================================== */
+router.get("/active", async (req, res) => {
     try {
         const { insuranceID } = req.query;
-        if (!insuranceID) return res.status(400).json({ message: 'insuranceID is required' });
+        if (!insuranceID)
+            return res.status(400).json({ message: "insuranceID is required" });
 
         const active = await Claim.aggregate([
             { $match: { insuranceID, isClosed: false } },
 
-            /* Customer */
             {
                 $lookup: {
-                    from: 'users',
-                    localField: 'customerID',
-                    foreignField: 'customerID',
-                    as: 'customer'
+                    from: "users",
+                    localField: "customerID",
+                    foreignField: "customerID",
+                    as: "customer"
                 }
             },
-            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+            { $unwind: "$customer" },
 
-            /* Car */
             {
                 $lookup: {
-                    from: 'cars',
-                    localField: 'carID',
-                    foreignField: 'carID',
-                    as: 'car'
+                    from: "cars",
+                    localField: "carID",
+                    foreignField: "carID",
+                    as: "car"
                 }
             },
-            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
+            { $unwind: "$car" },
 
             {
                 $project: {
@@ -181,44 +254,80 @@ router.get('/active', async (req, res) => {
 
                     customerName: {
                         $concat: [
-                            { $ifNull: ['$customer.firstName', ''] }, ' ',
-                            { $ifNull: ['$customer.lastName', ''] }
+                            "$customer.firstName",
+                            " ",
+                            "$customer.lastName"
                         ]
                     },
-                    carBrand:'$car.brand',
-                    carModel: '$car.model',
-                    carYear: '$car.year',
-                    licensePlate: '$car.licensePlate'
+
+                    carBrand: "$car.brand",
+                    carModel: "$car.model",
+                    carYear: "$car.year",
+                    licensePlate: "$car.licensePlate",
+                    engineID: "$car.engineID",
+                    policyNumber: "$car.policyNumber"
                 }
             }
         ]);
 
         res.json(active);
+
     } catch (err) {
-        console.error('Error fetching active claims:', err);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error fetching active claims:", err);
+        res.status(500).json({ message: "Server error" });
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ Customer → เคลมทั้งหมด
-──────────────────────────────────────────────────*/
-router.get('/customer/:customerID', async (req, res) => {
+/* =====================================================
+   ✅ 4) Customer → เคลมทั้งหมด
+===================================================== */
+router.get("/customer/:customerID", async (req, res) => {
     try {
-        const claims = await Claim.find({ customerID: req.params.customerID })
-            .sort({ incidentDate: -1 });
+        const claims = await Claim.aggregate([
+            { $match: { customerID: req.params.customerID } },
+
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carID",
+                    foreignField: "carID",
+                    as: "car"
+                }
+            },
+            { $unwind: "$car" },
+
+            {
+                $project: {
+                    _id: 1,
+                    claimNumber: 1,
+                    title: 1,
+                    incidentDate: 1,
+                    state: 1,
+                    currentStep: 1,
+                    isClosed: 1,
+
+                    carModel: "$car.model",
+                    licensePlate: "$car.licensePlate",
+                    carBrand: "$car.brand",
+                    carYear: "$car.year"
+                }
+            },
+
+            { $sort: { incidentDate: -1 } }
+        ]);
 
         res.json({ success: true, claims });
+
     } catch (err) {
-        console.error('Error fetching customer claims:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ Customer Stats
-──────────────────────────────────────────────────*/
-router.get('/customer/:customerID/stats', async (req, res) => {
+/* =====================================================
+   ✅ 5) Stats
+===================================================== */
+router.get("/customer/:customerID/stats", async (req, res) => {
     try {
         const { customerID } = req.params;
 
@@ -230,57 +339,56 @@ router.get('/customer/:customerID/stats', async (req, res) => {
             success: true,
             stats: { total, ongoing, completed }
         });
+
     } catch (err) {
-        console.error('Error fetching stats:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Error fetching stats:", err);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ ✅ ✅ Claim Detail (Customer)
-   GET /api/claims/detail/:claimNumber
-──────────────────────────────────────────────────*/
-router.get('/detail/:claimNumber', async (req, res) => {
+/* =====================================================
+   ✅ 6) Detail
+===================================================== */
+router.get("/detail/:claimNumber", async (req, res) => {
     try {
         const claimNumber = req.params.claimNumber;
 
         const claim = await Claim.aggregate([
             { $match: { claimNumber } },
 
-            /* Customer */
             {
                 $lookup: {
-                    from: 'users',
-                    localField: 'customerID',
-                    foreignField: 'customerID',
-                    as: 'customer'
+                    from: "users",
+                    localField: "customerID",
+                    foreignField: "customerID",
+                    as: "customer"
                 }
             },
-            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+            // --- FIX HERE ---
+            { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
 
-            /* Insurance Officer */
             {
                 $lookup: {
                     from: "users",
                     localField: "insuranceID",
-                    foreignField: "insuranceID",   // ✅ FIX
+                    foreignField: "insuranceID",
                     as: "insurance"
                 }
             },
+            // --- FIX HERE ---
             { $unwind: { path: "$insurance", preserveNullAndEmptyArrays: true } },
 
-            /* Car */
             {
                 $lookup: {
-                    from: 'cars',
-                    localField: 'carID',
-                    foreignField: 'carID',
-                    as: 'car'
+                    from: "cars",
+                    localField: "carID",
+                    foreignField: "carID",
+                    as: "car"
                 }
             },
-            { $unwind: { path: '$car', preserveNullAndEmptyArrays: true } },
+            // --- FIX HERE ---
+            { $unwind: { path: "$car", preserveNullAndEmptyArrays: true } },
 
-            /* Garage */
             {
                 $lookup: {
                     from: "users",
@@ -294,56 +402,49 @@ router.get('/detail/:claimNumber', async (req, res) => {
             },
             { $unwind: { path: "$garage", preserveNullAndEmptyArrays: true } },
 
-            /* PROJECT */
+            // ... $project stage ...
+            // (ใน $project อาจจะต้องเพิ่มการ check null เช่น $ifNull)
             {
                 $project: {
-                    id: "$_id",
+                    id: "$customer.customerID", // อาจเป็น null
                     claimNumber: 1,
                     title: 1,
-                    detail: 1,
-                    location: 1,
+                    // ... (rest of your fields) ...
 
-                    state: 1,
-                    status: 1,
-                    currentStep: 1,
-                    priorityLevel: 1,
-                    isClosed: 1,
+                    // ถ้า $unwind แล้วเป็น null, $car.model จะเป็น null
+                    // ใช้ $ifNull เพื่อป้องกัน error
+                    carModel: { $ifNull: ["$car.model", "N/A"] },
+                    carBrand: { $ifNull: ["$car.brand", "N/A"] },
+                    carYear: { $ifNull: ["$car.year", "N/A"] },
+                    licensePlate: { $ifNull: ["$car.licensePlate", "N/A"] },
+                    // ... (rest of car fields) ...
 
-                    incidentDate: 1,
-                    reportedDate: 1,
-                    inspectionDate: 1,
-                    approvalDate: 1,
-                    garageSelectedDate: 1,
-                    repairStartDate: 1,
-                    completedDate: 1,
+                    garageName: { $ifNull: ["$garage.garageName", "N/A"] },
+                    // ... (rest of garage fields) ...
 
-                    estimatedCost: 1,
-                    approvedCost: 1,
-                    additionalCost: 1,
-
-                    /* Car */
-                    carModel: '$car.model',
-                    carBrand: '$car.brand',
-                    licensePlate: '$car.licensePlate',
-                    carColor: '$car.color',
-                    Year: '$car.year',
-
-                    /* Garage */
-                    garageName: '$garage.garageName',
-                    garagePhone: '$garage.phoneNumber',
-                    garageEmail: '$garage.email',
-
-                    /* ✅ Officer (Insurance User) */
                     assignedOfficer: {
                         name: {
                             $concat: [
-                                { $ifNull: ['$insurance.firstName', ''] }, ' ',
-                                { $ifNull: ['$insurance.lastName', ''] }
+                                { $ifNull: ["$insurance.firstName", ""] },
+                                " ",
+                                { $ifNull: ["$insurance.lastName", ""] }
                             ]
                         },
-                        phone: '$insurance.phoneNumber',
-                        email: '$insurance.email'
-                    }
+                        phone: "$insurance.phoneNumber",
+                        email: "$insurance.email"
+                    },
+
+                    // --- สำคัญมาก: เพิ่มข้อมูลลูกค้าที่นี่ ---
+                    // คุณลืมใส่ข้อมูลลูกค้าใน $project
+                    customerName: {
+                        $concat: [
+                            { $ifNull: ["$customer.firstName", ""] },
+                            " ",
+                            { $ifNull: ["$customer.lastName", ""] }
+                        ]
+                    },
+                    customerPhone: { $ifNull: ["$customer.phoneNumber", "N/A"] },
+                    customerEmail: { $ifNull: ["$customer.email", "N/A"] }
                 }
             }
         ]);
@@ -351,44 +452,44 @@ router.get('/detail/:claimNumber', async (req, res) => {
         res.json({ success: true, claim: claim[0] || null });
 
     } catch (err) {
-        console.error('Error fetching claim detail:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Detail error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
     }
 });
 
-/* ────────────────────────────────────────────────
-   ✅ เปลี่ยน state/status + history
-──────────────────────────────────────────────────*/
-router.patch('/:claimNumber/state', async (req, res) => {
+/* =====================================================
+   ✅ 7) Update State / Status
+===================================================== */
+router.patch("/:claimNumber/state", async (req, res) => {
     try {
         const { claimNumber } = req.params;
         const { state, status } = req.body;
 
         const updated = await Claim.findOneAndUpdate(
             { claimNumber },
-            { ...(state ? { state } : {}), ...(status ? { status } : {}) },
+            { ...(state && { state }), ...(status && { status }) },
             { new: true }
         );
 
-        if (!updated) return res.status(404).json({ message: 'Claim not found' });
+        if (!updated) return res.status(404).json({ message: "Claim not found" });
 
         res.json(updated);
+
     } catch (err) {
-        console.error('Update state error:', err);
+        console.error("Update state error:", err);
         res.status(400).json({ message: err.message });
     }
 });
 
-/* ────────────────────────────────────────────────
-   Insurance Dashboard Summary
-   GET /api/claims/stats/summary
-──────────────────────────────────────────────────*/
-router.get('/stats/summary', async (req, res) => {
+/* =====================================================
+   ✅ 8) Summary Dashboard
+===================================================== */
+router.get("/stats/summary", async (req, res) => {
     try {
         const totalClaims = await Claim.countDocuments({});
         const pendingClaims = await Claim.countDocuments({
             isClosed: false,
-            status: { $in: ["new", "survey", "approved", "choose_garage", "repair"] }
+            status: { $in: ["new", "inspecting", "pending_report"] }
         });
         const completedClaims = await Claim.countDocuments({
             isClosed: true
@@ -399,10 +500,399 @@ router.get('/stats/summary', async (req, res) => {
             pendingClaims,
             completedClaims
         });
+
     } catch (err) {
         console.error("Error getting stats:", err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: "Server error" });
     }
+});
+
+router.patch("/:claimNumber", async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+        const updateData = req.body;
+
+        const updated = await Claim.findOneAndUpdate(
+            { claimNumber },
+            updateData,
+            { new: true }
+        );
+
+        if (!updated)
+            return res.status(404).json({ success:false, message:"Claim not found"});
+
+        res.json({ success:true, claim: updated });
+
+    } catch (err) {
+        console.error("Update claim error:", err);
+        res.status(500).json({ success:false, message: err.message });
+    }
+});
+
+/* =====================================================
+   ✅ 9) Repair Items CRUD
+===================================================== */
+router.post("/:claimNumber/repair-items", async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+        const { type, cost, remark } = req.body;
+
+        const item = await RepairItem.create({
+            claimNumber,
+            type,
+            cost,
+            remark
+        });
+
+        res.json({ success: true, item });
+
+    } catch (err) {
+        console.error("Add repair item error:", err);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+});
+
+router.get("/:claimNumber/repair-items", async (req, res) => {
+    try {
+        const items = await RepairItem.find({
+            claimNumber: req.params.claimNumber
+        }).sort({ createdAt: -1 });
+
+        res.json({ success: true, items });
+
+    } catch (err) {
+        console.error("Fetch repair items error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+router.patch("/repair-items/:repairNumber", async (req, res) => {
+    try {
+        const updated = await RepairItem.findOneAndUpdate(
+            { repairNumber: req.params.repairNumber },
+            req.body,
+            { new: true }
+        );
+
+        res.json({ success: true, item: updated });
+
+    } catch (err) {
+        console.error("Update repair item error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+router.delete("/repair-items/:repairNumber", async (req, res) => {
+    try {
+        await RepairItem.findOneAndDelete({
+            repairNumber: req.params.repairNumber
+        });
+
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error("Delete repair item error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+/* =====================================================
+   ✅ 10) Upload Accident Photos (upload middleware)
+===================================================== */
+router.post("/:claimNumber/photos", upload.single("photo"), async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+        const { type, caption } = req.body;
+
+        if (!req.file)
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+
+        const saved = await AccidentPhoto.create({
+            claimNumber,
+            type: type || "damage",
+            caption: caption || null,
+            photoURL: req.file.path       // ✅ URL จาก cloudinary
+        });
+
+        res.json({ success: true, photo: saved });
+
+    } catch (err) {
+        console.error("Upload photo error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/* =====================================================
+   ✅ 11) List Photos
+===================================================== */
+router.get("/:claimNumber/photos", async (req, res) => {
+    try {
+        const photos = await AccidentPhoto.find({
+            claimNumber: req.params.claimNumber
+        }).sort({ createdAt: -1 });
+
+        res.json({ success: true, photos });
+
+    } catch (err) {
+        console.error("Fetch photos error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+/* =====================================================
+   ✅ 12) Delete Photo (Cloudinary + DB)
+===================================================== */
+router.delete("/photos/:id", async (req, res) => {
+    try {
+        const photo = await AccidentPhoto.findById(req.params.id);
+
+        if (!photo)
+            return res.status(404).json({ success: false, message: "Not found" });
+
+        // --- ✅ START FIX ---
+        // แก้ไข Logic การดึง publicId ให้ถูกต้อง
+        const url = photo.photoURL;
+        const uploadMarker = "/upload/";
+
+        // 1. หาตำแหน่งของ "/upload/"
+        const uploadIndex = url.indexOf(uploadMarker);
+
+        // 2. ตัดเอาเฉพาะส่วนที่อยู่หลัง "/upload/" (เช่น v123456/claims/...)
+        const afterUpload = url.substring(uploadIndex + uploadMarker.length);
+
+        // 3. หาทับ (/) ตัวแรก (ที่อยู่หลัง v123456) แล้วตัดทิ้งไป
+        const publicIdWithExtension = afterUpload.substring(afterUpload.indexOf('/') + 1);
+
+        // 4. ลบนามสกุลไฟล์ .jpg, .png ออก
+        const publicId = publicIdWithExtension.replace(/\.[^/.]+$/, "");
+        // --- ✅ END FIX ---
+
+        // (เพิ่ม Log เพื่อดูว่าเราได้ publicId ถูกต้องหรือไม่)
+        console.log("Attempting to delete from Cloudinary. Public ID:", publicId);
+
+        await cloudinary.uploader.destroy(publicId);
+
+        await AccidentPhoto.findByIdAndDelete(req.params.id);
+
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error("Delete photo error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/* =====================================================
+   ✅ 13) Submit Claim → เปลี่ยน state → survey
+===================================================== */
+router.post("/:claimNumber/submit", async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+
+        const updated = await Claim.findOneAndUpdate(
+            { claimNumber },
+            {
+                state: "survey",
+                status: "inspecting",
+                currentStep: 2,
+                inspectionDate: new Date().toISOString().slice(0, 16).replace("T", " ")
+            },
+            { new: true }
+        );
+
+        if (!updated)
+            return res.status(404).json({ success: false, message: "Not found" });
+
+        res.json({ success: true, claim: updated });
+
+    } catch (err) {
+        console.error("Submit error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.get("/full-detail/:claimNumber", async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+
+        const claim = await Claim.aggregate([
+            { $match: { claimNumber } },
+
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "customerID",
+                    foreignField: "customerID",
+                    as: "customer"
+                }
+            },
+            { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } }
+        ]);
+
+        if (!claim[0]) {
+            return res.status(404).json({ success: false, message: "Claim not found" });
+        }
+
+        const photos = await AccidentPhoto.find({ claimNumber });
+        const repairItems = await RepairItem.find({ claimNumber });
+
+        return res.json({
+            success: true,
+            claim: {
+                ...claim[0],
+                customerName: claim[0].customer
+                    ? `${claim[0].customer.firstName} ${claim[0].customer.lastName}`
+                    : null
+            },
+            photos,
+            repairItems
+        });
+
+    } catch (err) {
+        console.error("🔥 FULL DETAIL ERROR:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/* =====================================================
+✅ 14) SAVE DRAFT / SUBMIT (Frontend เรียกตัวนี้)
+===================================================== */
+router.post("/save/:claimNumber", async (req, res) => {
+
+    // ⭐️⭐️⭐️ START DEBUG ⭐️⭐️⭐️
+    console.log(`\n[SAVE /${req.params.claimNumber}] - START`);
+
+    try {
+        const { claimNumber } = req.params;
+
+        const {
+            damageDescription,
+            inspectionDate,
+            photosToCreate = [],
+            photosToUpdate = [],
+            repairItems = [],
+            mode
+        } = req.body;
+
+        console.log("[SAVE] 1. Finding claim...");
+        const claim = await Claim.findOne({ claimNumber });
+        if (!claim) return res.status(404).json({ success: false, message: "Claim not found" });
+
+        claim.detail = damageDescription;
+        claim.inspectionDate = inspectionDate; // (ใช้ inspectionDate ที่แก้แล้ว)
+
+        if (mode === "submit") {
+            claim.state = "survey";
+            claim.currentStep = (claim.currentStep || 1) + 1;
+        }
+
+        console.log("[SAVE] 2. Saving claim details...");
+        await claim.save();
+        console.log("[SAVE] 3. Claim details SAVED.");
+
+        // ✅ 2A) สร้างรูปใหม่ (Upload to Cloudinary)
+        console.log(`[SAVE] 4. Processing ${photosToCreate.length} new photos...`);
+        for (const p of photosToCreate) {
+            console.log(`[SAVE] 4A. Uploading temp file: ${p.tempFileName}`);
+            const tempFilePath = path.join(tempDir, p.tempFileName);
+
+            const result = await cloudinary.uploader.upload(
+                tempFilePath,
+                { folder: `claims/${claimNumber}` }
+            );
+            console.log(`[SAVE] 4B. Cloudinary SUCCESS. URL: ${result.secure_url}`);
+
+            await AccidentPhoto.create({
+                claimNumber,
+                type: p.type,
+                caption: p.caption,
+                photoURL: result.secure_url
+            });
+            console.log("[SAVE] 4C. AccidentPhoto DB SAVED.");
+
+            try {
+                fs.unlinkSync(tempFilePath);
+                console.log(`[SAVE] 4D. Temp file ${p.tempFileName} DELETED.`);
+            } catch (delErr) {
+                console.error("Failed to delete temp file:", tempFilePath, delErr);
+            }
+        }
+
+        // ✅ 2B) อัปเดตรูปเก่า (อัปเดต Type/Caption)
+        console.log(`[SAVE] 5. Processing ${photosToUpdate.length} existing photos...`);
+        for (const p of photosToUpdate) {
+            if (p._id && p._id.length > 12) {
+                await AccidentPhoto.findByIdAndUpdate(p._id, {
+                    type: p.type,
+                    caption: p.caption
+                });
+            }
+        }
+        console.log("[SAVE] 6. Existing photos UPDATED.");
+
+        // ✅ 3) SAVE REPAIR ITEMS
+        console.log(`[SAVE] 7. Processing ${repairItems.length} repair items...`);
+        for (const item of repairItems) {
+            if (!item.type) {
+                continue;
+            }
+
+            const itemData = {
+                claimNumber,
+                type: item.type === "other" ? (item.customDescription || 'อื่นๆ') : item.type,
+                cost: Number(item.cost) || 0
+            };
+
+            if (item._id && item._id.length > 12) {
+                console.log(`[SAVE] 7A. Updating RepairItem ID: ${item._id}`);
+                await RepairItem.findByIdAndUpdate(item._id, itemData);
+            } else {
+                console.log("[SAVE] 7B. Creating new RepairItem...");
+                await RepairItem.create(itemData);
+            }
+        }
+        console.log("[SAVE] 8. RepairItems SAVED.");
+
+        return res.json({ success: true });
+
+    } catch (err) {
+        // ⭐️⭐️⭐️ ถ้ามัน Error มันจะมาที่นี่ ⭐️⭐️⭐️
+        console.error("🔥 SAVE ERROR (IN CATCH BLOCK):", err);
+        return res.status(500).json({ success: false, error: err });
+    }
+});
+
+router.delete("/photo/:id", async (req, res) => {
+    try {
+        await AccidentPhoto.findByIdAndDelete(req.params.id);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.delete("/repair-item/:id", async (req, res) => {
+    try {
+        await RepairItem.findByIdAndDelete(req.params.id);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+// ✅ route
+router.post("/upload-temp", uploadTemp.single("image"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    return res.json({
+        success: true,
+        tempFileName: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size
+    });
 });
 
 module.exports = router;

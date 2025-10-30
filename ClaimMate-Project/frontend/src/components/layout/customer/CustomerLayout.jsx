@@ -4,6 +4,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import CustomerNavbar from './CustomerNavbar';
 import CustomerSidebar from './CustomerSidebar';
 
+
 const CustomerLayout = () => {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
