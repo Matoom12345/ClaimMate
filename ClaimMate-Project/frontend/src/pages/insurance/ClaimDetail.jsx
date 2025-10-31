@@ -88,7 +88,7 @@ const ClaimDetail = () => {
           status: detail?.state || rawClaim?.state || 'new',
           priority: detail?.priorityLevel || 'normal',
 
-          customerName: detail?.customerName || '-',
+          customerName: detail.customerFirstName + " " + detail.customerLastName || '-',
           customerPhone: detail?.customerPhone || '-',
           customerEmail: detail?.assignedOfficer?.email || '-', // ไม่มีใน join ฝั่งลูกค้าโดยตรง
 
