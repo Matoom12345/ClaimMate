@@ -185,6 +185,8 @@ router.get("/all", async (req, res) => {
                     carColor: "$car.color",
                     engineID: "$car.engineID",
                     policyNumber: "$car.policyNumber",
+                    insuranceCreateAt: "$car.insuranceCreateAt",
+                    insuranceExpireAt: "$car.insuranceExpireAt",
 
                     garageName: "$garage.garageName",
                     garagePhone: "$garage.phoneNumber",
@@ -257,7 +259,9 @@ router.get("/active", async (req, res) => {
                     carYear: "$car.year",
                     licensePlate: "$car.licensePlate",
                     engineID: "$car.engineID",
-                    policyNumber: "$car.policyNumber"
+                    policyNumber: "$car.policyNumber",
+                    insuranceCreateAt: "$car.insuranceCreateAt",
+                    insuranceExpireAt: "$car.insuranceExpireAt",
                 }
             }
         ]);
@@ -473,6 +477,9 @@ router.get("/detail/:claimNumber", async (req, res) => {
                     carYear: { $ifNull: ["$car.year", ""] },
                     licensePlate: { $ifNull: ["$car.licensePlate", ""] },
                     engineID: { $ifNull: ["$car.engineID", ""] },
+                    policyNumber: "$car.policyNumber",
+                    insuranceCreateAt: "$car.insuranceCreateAt",
+                    insuranceExpireAt: "$car.insuranceExpireAt",
 
                     // ✅ garage object
                     garageName: { $ifNull: ["$garage.garageName", null] },

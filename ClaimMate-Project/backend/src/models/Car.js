@@ -10,9 +10,12 @@ const carSchema = new mongoose.Schema({
     licensePlate:    { type: String, required: true, unique: true }, // แนะนำให้ unique
     color:           { type: String, required: true, trim: true },
     engineID:        { type: String, required: true, unique: true },
+
     policyNumber:    { type: String, required: true, unique: true },
     insuranceLevel:  { type: Number, enum: [1, 2, 3], required: true },
-    insuranceBalance:{ type: Number, required: true }
+    insuranceBalance:{ type: Number, required: true },
+    insuranceCreateAt:{ type:String, required:true,  match:[/^\d{4}-\d{2}-\d{2}$/,'Invalid date format'] },
+    insuranceExpireAt:{ type:String, required:true,  match:[/^\d{4}-\d{2}-\d{2}$/,'Invalid date format'] },
 }, { versionKey: false, collection: 'cars' });
 
 // สร้าง carID ก่อน validate (จะไม่ล้มเพราะ required)
