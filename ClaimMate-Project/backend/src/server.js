@@ -16,6 +16,7 @@ const carRoute = require('./routes/carRoute');
 const claimRoute = require('./routes/claimRoute');
 const authRoute = require('./routes/authRoute');
 const userRoute = require("./routes/userRoute");
+const urgentRequestRoute = require('./routes/urgentRequestRoute');
 
 
 // Middleware
@@ -32,6 +33,7 @@ app.use('/api/claims', claimRoute);
 app.use('/api/cars', carRoute);
 app.use('/api/auth', authRoute);
 app.use("/api/users", userRoute);
+app.use('/api/urgent-request', urgentRequestRoute);
 
 
 // เชื่อมต่อ MongoDB

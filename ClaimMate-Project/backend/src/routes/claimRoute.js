@@ -339,6 +339,51 @@ router.get("/customer/:customerID/stats", async (req, res) => {
 });
 
 /* =====================================================
+   ✅ ⭐️ NEW ⭐️) Customer → เคลมที่กำลังซ่อม (state: 'repair')
+===================================================== */
+router.get("/customer/:customerID/repair-claims", async (req, res) => {
+    try {
+        const { customerID } = req.params;
+
+        // 1. ค้นหาเคลมของลูกค้าที่มี state: "repair"
+        const claims = await Claim.aggregate([
+            { $match: { customerID: customerID, state: "repair" } },
+            {
+                $lookup: {
+                    from: "cars",
+                    localField: "carID",
+                    foreignField: "carID",
+                    as: "car"
+                }
+            },
+            { $unwind: "$car" },
+            {
+                $project: {
+                    _id: 0,
+                    claimNumber: 1, // (Value)
+                    // (Display) {car.brand} {car.model} ({car.year}) {car.licensePlate}
+                    display: {
+                        $concat: [
+                            "$car.brand", " ", "$car.model",
+                            " (", "$car.year", ") ",
+                            "$car.licensePlate"
+                        ]
+                    }
+                }
+            },
+            { $sort: { reportedDate: -1 } }
+        ]);
+
+        res.json({ success: true, claims });
+
+    } catch (err) {
+        console.error("Error fetching repair-claims:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+
+/* =====================================================
    ✅ 6) Detail
 ===================================================== */
 router.get("/detail/:claimNumber", async (req, res) => {
@@ -684,25 +729,18 @@ router.delete("/photos/:id", async (req, res) => {
         // --- ✅ START FIX ---
         // แก้ไข Logic การดึง publicId ให้ถูกต้อง
         const url = photo.photoURL;
-        const uploadMarker = "/upload/";
 
-        // 1. หาตำแหน่งของ "/upload/"
-        const uploadIndex = url.indexOf(uploadMarker);
-
-        // 2. ตัดเอาเฉพาะส่วนที่อยู่หลัง "/upload/" (เช่น v123456/claims/...)
-        const afterUpload = url.substring(uploadIndex + uploadMarker.length);
-
-        // 3. หาทับ (/) ตัวแรก (ที่อยู่หลัง v123456) แล้วตัดทิ้งไป
-        const publicIdWithExtension = afterUpload.substring(afterUpload.indexOf('/') + 1);
-
-        // 4. ลบนามสกุลไฟล์ .jpg, .png ออก
-        const publicId = publicIdWithExtension.replace(/\.[^/.]+$/, "");
+        // ⭐️ ใช้ Regex ที่ดีกว่าเพื่อดึง publicId
+        const publicIdMatch = url.match(/\/v\d+\/(.+)\.\w+$/);
+        if (!publicIdMatch || !publicIdMatch[1]) {
+            console.error("Could not parse publicId from URL:", url);
+            // ถึงแม้จะลบ Cloudinary ไม่ได้ ก็ควรลบออกจาก DB
+        } else {
+            const publicId = publicIdMatch[1];
+            console.log("Attempting to delete from Cloudinary. Public ID:", publicId);
+            await cloudinary.uploader.destroy(publicId);
+        }
         // --- ✅ END FIX ---
-
-        // (เพิ่ม Log เพื่อดูว่าเราได้ publicId ถูกต้องหรือไม่)
-        console.log("Attempting to delete from Cloudinary. Public ID:", publicId);
-
-        await cloudinary.uploader.destroy(publicId);
 
         await AccidentPhoto.findByIdAndDelete(req.params.id);
 
