@@ -1,36 +1,18 @@
 const express = require("express");
 const router = express.Router();
 
-const path = require("path");
-const fs = require("fs");
-const multer = require("multer");
-
-// ✅ ensure temp folder exists
-const tempDir = path.join(__dirname, "../../tempUploads");
-if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
-}
-
-// ✅ temp storage
-const tempStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, tempDir);
-    },
-    filename: (req, file, cb) => {
-        const unique = "temp_" + Date.now() + "_" + file.originalname;
-        cb(null, unique);
-    }
-});
-
-// ✅ middleware
-const uploadTemp = multer({ storage: tempStorage });
+// ❌ ลบ fs, path, และ tempStorage/uploadTemp
+// const path = require("path");
+// const fs = require("fs");
+// const multer = require("multer");
 
 const Claim = require("../models/Claim");
 const RepairItem = require("../models/RepairItem");
 const AccidentPhoto = require("../models/AccidentPhoto");
 
-const upload = require("../middlewares/upload");
+const upload = require("../middlewares/upload"); // ✅ (ตัวนี้ใช้ memoryStorage)
 const cloudinary = require("../config/cloudinary");
+const uploadImage = require("../utils/uploadToCloudinary"); // ⭐️ (เพิ่ม import นี้)
 
 
 
@@ -607,11 +589,17 @@ router.post("/:claimNumber/photos", upload.single("photo"), async (req, res) => 
         if (!req.file)
             return res.status(400).json({ success: false, message: "No file uploaded" });
 
+        // ⭐️ แก้ไข: ใช้อัปโหลด Buffer (จาก memoryStorage)
+        const result = await uploadImage(
+            req.file.buffer,
+            `claims/${claimNumber}`
+        );
+
         const saved = await AccidentPhoto.create({
             claimNumber,
             type: type || "damage",
             caption: caption || null,
-            photoURL: req.file.path       // ✅ URL จาก cloudinary
+            photoURL: result.secure_url // ✅ URL จาก cloudinary
         });
 
         res.json({ success: true, photo: saved });
@@ -756,117 +744,127 @@ router.get("/full-detail/:claimNumber", async (req, res) => {
 
 /* =====================================================
 ✅ 14) SAVE DRAFT / SUBMIT (Frontend เรียกตัวนี้)
+   ⭐️⭐️⭐️ (โค้ดใหม่ทั้งหมด) ⭐️⭐️⭐️
 ===================================================== */
-router.post("/save/:claimNumber", async (req, res) => {
+router.post(
+    "/save/:claimNumber",
+    // ⭐️ 1. ใช้ upload (memoryStorage) รับไฟล์ Array ชื่อ "newPhotos"
+    upload.array("newPhotos"),
+    async (req, res) => {
 
-    // ⭐️⭐️⭐️ START DEBUG ⭐️⭐️⭐️
-    console.log(`\n[SAVE /${req.params.claimNumber}] - START`);
+        console.log(`\n[SAVE /${req.params.claimNumber}] - START`);
 
-    try {
-        const { claimNumber } = req.params;
+        try {
+            const { claimNumber } = req.params;
 
-        const {
-            damageDescription,
-            inspectionDate,
-            photosToCreate = [],
-            photosToUpdate = [],
-            repairItems = [],
-            mode
-        } = req.body;
+            // ⭐️ 2. ดึงข้อมูล Text Fields และ Parse JSON
+            const {
+                damageDescription,
+                inspectionDate,
+                mode
+            } = req.body;
 
-        console.log("[SAVE] 1. Finding claim...");
-        const claim = await Claim.findOne({ claimNumber });
-        if (!claim) return res.status(404).json({ success: false, message: "Claim not found" });
+            // (ข้อมูล Array ที่ส่งมาเป็น JSON string)
+            const photosToUpdate = JSON.parse(req.body.photosToUpdate || "[]");
+            const repairItems = JSON.parse(req.body.repairItems || "[]");
 
-        claim.detail = damageDescription;
-        claim.inspectionDate = inspectionDate; // (ใช้ inspectionDate ที่แก้แล้ว)
+            // ⭐️ 3. ดึง Metadata ของไฟล์ใหม่ (ที่ส่งมาเป็น Array คู่ขนาน)
+            const newPhotoCaptions = Array.isArray(req.body.newPhotoCaptions)
+                ? req.body.newPhotoCaptions
+                : [req.body.newPhotoCaptions];
 
-        if (mode === "submit") {
-            claim.state = "survey";
-            claim.currentStep = (claim.currentStep || 1) + 1;
-        }
+            const newPhotoTypes = Array.isArray(req.body.newPhotoTypes)
+                ? req.body.newPhotoTypes
+                : [req.body.newPhotoTypes];
 
-        console.log("[SAVE] 2. Saving claim details...");
-        await claim.save();
-        console.log("[SAVE] 3. Claim details SAVED.");
+            // ⭐️ 4. ไฟล์ใหม่อยู่ใน req.files
+            const newPhotoFiles = req.files || [];
 
-        // ✅ 2A) สร้างรูปใหม่ (Upload to Cloudinary)
-        console.log(`[SAVE] 4. Processing ${photosToCreate.length} new photos...`); // <--- (Log ที่คุณเห็น)
-        for (const p of photosToCreate) {
+            console.log("[SAVE] 1. Finding claim...");
+            const claim = await Claim.findOne({ claimNumber });
+            if (!claim) return res.status(404).json({ success: false, message: "Claim not found" });
 
-            // ⭐️⭐️⭐️ เพิ่ม 2 บรรทัดนี้ ⭐️⭐️⭐️
-            console.log(`[SAVE DEBUG] 4A. Uploading to Cloudinary: ${p.tempFileName}`);
-            const tempFilePath = path.join(tempDir, p.tempFileName);
+            claim.detail = damageDescription;
+            claim.inspectionDate = inspectionDate;
 
-            const result = await cloudinary.uploader.upload(
-                tempFilePath,
-                { folder: `claims/${claimNumber}` }
-            );
-
-            // ⭐️⭐️⭐️ เพิ่ม 1 บรรทัดนี้ ⭐️⭐️⭐️
-            console.log(`[SAVE DEBUG] 4B. Creating AccidentPhoto in DB...`);
-
-            await AccidentPhoto.create({
-                claimNumber,
-                type: p.type,
-                caption: p.caption,
-                photoURL: result.secure_url
-            });
-
-            // ⭐️⭐️⭐️ เพิ่ม 1 บรรทัดนี้ ⭐️⭐️⭐️
-            console.log(`[SAVE DEBUG] 4C. DB Create Done. Deleting temp file...`);
-
-            try {
-                fs.unlinkSync(tempFilePath);
-                console.log(`[SAVE] 4D. Temp file ${p.tempFileName} DELETED.`);
-            } catch (delErr) {
-                console.error("Failed to delete temp file:", tempFilePath, delErr);
+            if (mode === "submit") {
+                claim.state = "survey";
+                claim.currentStep = (claim.currentStep || 1) + 1;
             }
-        }
 
-        // ✅ 2B) อัปเดตรูปเก่า (อัปเดต Type/Caption)
-        console.log(`[SAVE] 5. Processing ${photosToUpdate.length} existing photos...`);
-        for (const p of photosToUpdate) {
-            if (p._id && p._id.length > 12) {
-                await AccidentPhoto.findByIdAndUpdate(p._id, {
-                    type: p.type,
-                    caption: p.caption
+            console.log("[SAVE] 2. Saving claim details...");
+            await claim.save();
+            console.log("[SAVE] 3. Claim details SAVED.");
+
+            // ✅ 2A) สร้างรูปใหม่ (Upload to Cloudinary จาก Buffer)
+            console.log(`[SAVE] 4. Processing ${newPhotoFiles.length} new photos...`);
+            for (let i = 0; i < newPhotoFiles.length; i++) {
+                const file = newPhotoFiles[i];
+                const caption = newPhotoCaptions[i] || '';
+                const type = newPhotoTypes[i] || 'damage';
+
+                console.log(`[SAVE DEBUG] 4A. Uploading buffer to Cloudinary...`);
+
+                // ⭐️ 5. อัปโหลด Buffer (จาก memoryStorage)
+                const result = await uploadImage(
+                    file.buffer,
+                    `claims/${claimNumber}`
+                );
+                console.log(`[SAVE DEBUG] 4B. Cloudinary SUCCESS.`);
+
+                await AccidentPhoto.create({
+                    claimNumber,
+                    type: type,
+                    caption: caption,
+                    photoURL: result.secure_url
                 });
+                console.log(`[SAVE DEBUG] 4C. DB Create Done.`);
+                // (ไม่ต้องลบ temp file)
             }
+
+            // ✅ 2B) อัปเดตรูปเก่า (อัปเดต Type/Caption)
+            console.log(`[SAVE] 5. Processing ${photosToUpdate.length} existing photos...`);
+            for (const p of photosToUpdate) {
+                if (p._id && p._id.length > 12) {
+                    await AccidentPhoto.findByIdAndUpdate(p._id, {
+                        type: p.type,
+                        caption: p.caption
+                    });
+                }
+            }
+            console.log("[SAVE] 6. Existing photos UPDATED.");
+
+            // ✅ 3) SAVE REPAIR ITEMS
+            console.log(`[SAVE] 7. Processing ${repairItems.length} repair items...`);
+            for (const item of repairItems) {
+                if (!item.type) {
+                    continue;
+                }
+
+                const itemData = {
+                    claimNumber,
+                    type: item.type === "other" ? (item.customDescription || 'อื่นๆ') : item.type,
+                    cost: Number(item.cost) || 0
+                };
+
+                if (item._id && item._id.length > 12) {
+                    console.log(`[SAVE] 7A. Updating RepairItem ID: ${item._id}`);
+                    await RepairItem.findByIdAndUpdate(item._id, itemData);
+                } else {
+                    console.log("[SAVE] 7B. Creating new RepairItem...");
+                    await RepairItem.create(itemData);
+                }
+            }
+            console.log("[SAVE] 8. RepairItems SAVED.");
+
+            return res.json({ success: true });
+
+        } catch (err) {
+            console.error("🔥 SAVE ERROR (IN CATCH BLOCK):", err);
+            return res.status(500).json({ success: false, error: err });
         }
-        console.log("[SAVE] 6. Existing photos UPDATED.");
-
-        // ✅ 3) SAVE REPAIR ITEMS
-        console.log(`[SAVE] 7. Processing ${repairItems.length} repair items...`);
-        for (const item of repairItems) {
-            if (!item.type) {
-                continue;
-            }
-
-            const itemData = {
-                claimNumber,
-                type: item.type === "other" ? (item.customDescription || 'อื่นๆ') : item.type,
-                cost: Number(item.cost) || 0
-            };
-
-            if (item._id && item._id.length > 12) {
-                console.log(`[SAVE] 7A. Updating RepairItem ID: ${item._id}`);
-                await RepairItem.findByIdAndUpdate(item._id, itemData);
-            } else {
-                console.log("[SAVE] 7B. Creating new RepairItem...");
-                await RepairItem.create(itemData);
-            }
-        }
-        console.log("[SAVE] 8. RepairItems SAVED.");
-
-        return res.json({ success: true });
-
-    } catch (err) {
-        // ⭐️⭐️⭐️ ถ้ามัน Error มันจะมาที่นี่ ⭐️⭐️⭐️
-        console.error("🔥 SAVE ERROR (IN CATCH BLOCK):", err);
-        return res.status(500).json({ success: false, error: err });
     }
-});
+);
 
 router.delete("/photo/:id", async (req, res) => {
     try {
@@ -887,18 +885,6 @@ router.delete("/repair-item/:id", async (req, res) => {
 });
 
 
-// ✅ route
-router.post("/upload-temp", uploadTemp.single("image"), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ success: false, message: "No file uploaded" });
-    }
-
-    return res.json({
-        success: true,
-        tempFileName: req.file.filename,
-        originalName: req.file.originalname,
-        size: req.file.size
-    });
-});
+// ❌ ลบ router.post("/upload-temp", ...) ทิ้ง
 
 module.exports = router;

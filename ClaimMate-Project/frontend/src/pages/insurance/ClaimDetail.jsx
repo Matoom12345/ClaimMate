@@ -1,17 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'; // ⭐️ 1. เพิ่ม useCallback
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Input, TextArea, FileUpload, Select } from '../../components';
 
-/**
- * เชื่อม backend ตามข้อกำหนด โดยไม่แก้ UI/โครงสร้างหน้าจอ
- * - โหลดข้อมูลจาก /detail และ /full-detail
- * - อัปโหลด temp ทันทีเมื่อเลือกไฟล์ (POST /api/claims/upload-temp, field=image)
- * - บันทึกแบบร่าง/ส่งออก ผ่าน POST /api/claims/save/:claimNumber (mode = draft/submit)
- * - ลบรูป/รายการซ่อมที่อยู่ใน DB ทันทีเมื่อผู้ใช้ลบ
- */
-
-// รายการซ่อมที่เป็นไปได้ (คงไว้ตามไฟล์เดิม)
+// (REPAIR_ITEMS_OPTIONS ... คงไว้เหมือนเดิม)
 const REPAIR_ITEMS_OPTIONS = [
   { value: 'bumper_front', label: 'เปลี่ยนกันชนหน้า', category: 'ด้านหน้า' },
   { value: 'bumper_rear', label: 'เปลี่ยนกันชนหลัง', category: 'ด้านหลัง' },
@@ -51,8 +43,8 @@ const ClaimDetail = () => {
   // รูปภาพทั้งหมดที่หน้า UI ใช้แสดง (รวมของเดิมจาก DB + ของใหม่ temp)
   const [images, setImages] = useState([]);
 
-  // ✅ FIX #1: ย้าย isUploading มาไว้ "หลัง" setImages และ "ใน" Component
-  const isUploading = images.some(img => img.loading === true);
+  // ⭐️ แก้ไข: (ลบ isUploading ออกจากที่นี่ เพราะเราจะไม่อัปโหลดทันที)
+  // const isUploading = images.some(img => img.loading === true);
 
   // ฟอร์มรายงาน
   const [reportData, setReportData] = useState({
@@ -159,6 +151,7 @@ const ClaimDetail = () => {
           preview: p.photoURL, // <--- ✅ FIX (แก้ปัญหาไม่แสดง)
           type: p.type || 'damage',
           caption: p.caption || '',
+          file: null // ⭐️ รูปที่มาจาก DB จะไม่มี File object
         }));
         setImages(existingImages);
       } catch (err) {
@@ -170,78 +163,23 @@ const ClaimDetail = () => {
     load();
   }, [id]);
 
-  // ⭐️ 2. ห่อ (Wrap) buildInspectionDateTime ด้วย useCallback
+  // ⭐️ ห่อ (Wrap) buildInspectionDateTime ด้วย useCallback (เผื่อ AutoSave ในอนาคต)
   const buildInspectionDateTime = useCallback(() => {
     // รวม yyyy-mm-dd + hh:mm → "yyyy-mm-dd hh:mm"
     const d = reportData.inspectionDate || new Date().toISOString().split('T')[0];
     const t = reportData.inspectionTime || new Date().toTimeString().slice(0, 5);
     return `${d} ${t}`;
-  }, [reportData.inspectionDate, reportData.inspectionTime]); // ⭐️ (Dependencies)
+  }, [reportData.inspectionDate, reportData.inspectionTime]);
 
-  // ⭐️ 3. ห่อ (Wrap) handleAutoSave ด้วย useCallback
+  // ⭐️ (AutoSave) - (ลบ Logic ออกตามคำขอ แต่คงไว้เผื่ออนาคต)
   const handleAutoSave = useCallback(async () => {
-    // (ย้าย 2 บรรทัดนี้เข้ามาใน useCallback เพื่อให้ได้ค่าล่าสุด)
-    const isUploading = images.some(img => img.loading === true);
-    const hasDirty =
-        (reportData.damageDescription && reportData.damageDescription.trim().length > 0) ||
-        (images || []).some(x => !x.existing) ||
-        (reportData.repairItems || []).some(x => !x.existing);
+    // (ไม่ทำอะไรตามคำขอ)
+  }, []);
 
-    // ✅ FIX #2: ถ้าไม่ Dirty "หรือ" กำลังอัปโหลด -> ห้าม AutoSave
-    // (ย้าย Check นี้มาไว้ข้างในสุด)
-    if (!hasDirty || isUploading) return;
-
-    try {
-      setAutoSaving(true);
-      const body = {
-        damageDescription: reportData.damageDescription || '',
-        inspectionDate: buildInspectionDateTime(), // (ใช้ฟังก์ชันที่ห่อแล้ว)
-        photosToCreate: (images || [])
-            .filter(x => !x.existing && x.tempFileName)
-            .map(x => ({
-              tempFileName: x.tempFileName,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
-        photosToUpdate: (images || [])
-            .filter(x => x.existing)
-            .map(x => ({
-              _id: x._id,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
-        repairItems: (reportData.repairItems || []).map(x => ({
-          _id: x.existing ? x._id : null,
-          type: x.type,
-          cost: Number(x.cost) || 0,
-          customDescription: x.customDescription || '',
-        })),
-        mode: 'draft',
-      };
-
-      await axios.post(`http://localhost:3000/api/claims/save/${id}`, body);
-
-      setLastSaved(new Date());
-
-      // --- ⭐️ 4. (FIX) ลบโค้ดที่โหลดซ้ำทั้งหมด (ป้องกัน Race Condition) ---
-      /* (โค้ด axios.get, setImages, setReportData ถูกลบจากตรงนี้) */
-
-    } catch (err) {
-      console.error('AutoSave failed:', err);
-    } finally {
-      setAutoSaving(false);
-    }
-  }, [id, images, reportData, buildInspectionDateTime]); // ⭐️ 5. เพิ่ม Dependencies
-
-  // Auto-save ทุก 30 วินาที
+  // ⭐️ (AutoSave) - (ลบ Logic ออกตามคำขอ)
   useEffect(() => {
-    const timer = setInterval(() => {
-      // ⭐️ 6. (FIX) เรียก handleAutoSave (ตัวที่ถูกสร้างใหม่โดย useCallback)
-      // (ลบ Check isUploading/hasDirty ออกจากที่นี่ เพราะย้ายไปไว้ใน useCallback แล้ว)
-      handleAutoSave();
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [handleAutoSave]); // ⭐️ 7. (FIX) Dependency เหลือแค่ handleAutoSave
+    // (ไม่ทำอะไรตามคำขอ)
+  }, [handleAutoSave]);
 
 
   const handleChange = (e) => {
@@ -250,61 +188,32 @@ const ClaimDetail = () => {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
-  // ✅ ฟังก์ชันใหม่สำหรับรับค่าที่อัปเดตจาก Modal (แก้ Caption/Type)
   const handleUpdateImages = (newFiles) => {
     setImages(newFiles);
   };
 
-  // (โค้ดนี้คือเวอร์ชันที่แก้ Race Condition แล้ว)
+  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
+  // (โค้ดนี้จะแค่เพิ่ม File object เข้าไปใน State)
   const handleImagesChange = async (e) => {
-    // `selected` คือ Array ที่ FileUpload.jsx สร้างให้
-    // มีโครงสร้าง { id, file, preview, type, caption }
     const selected = Array.from(e?.target?.files || []);
     if (!selected.length) return;
 
-    // 1. (FIX) เพิ่มไฟล์ทั้งหมดเข้า State ทันที (โดยใช้ ID ที่ FileUpload สร้างมา)
+    // 1. (FIX) เพิ่มไฟล์ทั้งหมดเข้า State ทันที
     const newImageEntries = selected.map(item => ({
-      id: item.id, // <-- ✅ ใช้ ID ที่ FileUpload (บรรทัด 82) สร้างมา
+      id: item.id,
       existing: false,
-      tempFileName: null, // ยังไม่ได้อัปโหลด
+      file: item.file,         // ⭐️ เก็บ File object
       preview: item.preview,
       fileName: item.file.name,
       type: item.type || 'damage',
       caption: item.caption || '',
-      loading: true, // <-- เพิ่ม flag ว่ากำลังอัปโหลด
+      loading: false,          // ⭐️ ไม่ loading แล้ว
     }));
 
     setImages(prev => [...prev, ...newImageEntries]);
     if (errors.images) setErrors(prev => ({ ...prev, images: '' }));
 
-    // 2. (FIX) วนลูปอัปโหลดในเบื้องหลัง และ "อัปเดต" State แทนการ "เพิ่ม"
-    try {
-      for (const item of newImageEntries) {
-        // หา File จริง จาก `selected` array
-        const fileObject = selected.find(s => s.id === item.id)?.file;
-        if (!fileObject) continue;
-
-        const fd = new FormData();
-        fd.append('image', fileObject);
-
-        const res = await axios.post('http://localhost:3000/api/claims/upload-temp', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        const tempFileName = res.data?.tempFileName;
-
-        // 3. (FIX) อัปเดต State โดยการ "merge" ข้อมูล (แก้ Race Condition)
-        setImages(prev => prev.map(img =>
-            img.id === item.id
-                ? { ...img, tempFileName: tempFileName, loading: false } // ✅ อัปเดต, คง caption ไว้
-                : img
-        ));
-      }
-    } catch (err) {
-      console.error('Upload-temp failed:', err);
-      // ถ้าล้มเหลว, ให้ลบรูปที่ "loading" ทิ้งไป
-      setImages(prev => prev.filter(img => img.loading !== true));
-    }
+    // 2. (FIX) ❌ ลบการอัปโหลดไป /upload-temp ทิ้ง
   };
 
   // (โค้ดนี้คือเวอร์ชันที่แก้ "ลบทั้งหมด" แล้ว)
@@ -406,45 +315,61 @@ const ClaimDetail = () => {
     return newErrors;
   };
 
+  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
   const handleSaveDraft = async () => {
     try {
       setSaving(true);
       setSubmitType('draft');
 
-      const body = {
-        damageDescription: reportData.damageDescription || '',
-        inspectionDate: buildInspectionDateTime(),
-        photosToCreate: (images || [])
-            .filter(x => !x.existing && x.tempFileName)
-            .map(x => ({
-              tempFileName: x.tempFileName,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
-        photosToUpdate: (images || [])
-            .filter(x => x.existing)
-            .map(x => ({
-              _id: x._id,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
-        repairItems: (reportData.repairItems || []).map(x => ({
-          _id: x.existing ? x._id : null,
-          type: x.type,
-          cost: Number(x.cost) || 0,
-          customDescription: x.customDescription || '',
-        })),
-        mode: 'draft',
-      };
+      // 1. สร้าง FormData
+      const formData = new FormData();
 
-      await axios.post(`http://localhost:3000/api/claims/save/${id}`, body);
+      // 2. แยกรูปใหม่ (ที่มี File) และรูปเก่า
+      const newImages = images.filter(x => !x.existing && x.file);
+      const photosToUpdate = images.filter(x => x.existing);
+
+      // 3. ใส่ข้อมูล Text (และ JSON ที่แปลงเป็น String)
+      formData.append("damageDescription", reportData.damageDescription || '');
+      formData.append("inspectionDate", buildInspectionDateTime());
+      formData.append("mode", "draft");
+
+      formData.append("photosToUpdate", JSON.stringify(
+          photosToUpdate.map(p => ({ _id: p._id, type: p.type, caption: p.caption }))
+      ));
+
+      formData.append("repairItems", JSON.stringify(
+          reportData.repairItems.map(x => ({
+            _id: x.existing ? x._id : null,
+            type: x.type,
+            cost: Number(x.cost) || 0,
+            customDescription: x.customDescription || '',
+          }))
+      ));
+
+      // 4. ใส่ไฟล์ใหม่ (และ Metadata) เป็น Array คู่ขนาน
+      newImages.forEach(img => {
+        formData.append("newPhotos", img.file, img.fileName); // File
+        formData.append("newPhotoCaptions", img.caption); // String
+        formData.append("newPhotoTypes", img.type);     // String
+      });
+
+      // 5. ส่ง Request แบบ multipart/form-data
+      await axios.post(
+          `http://localhost:3000/api/claims/save/${id}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+      );
 
       setLastSaved(new Date());
 
-      // --- ⭐️ 8. (FIX) ลบโค้ดที่โหลดซ้ำทั้งหมด (ป้องกัน Race Condition) ---
-      /* (โค้ด axios.get, setImages, setReportData ถูกลบจากตรงนี้) */
+      // (ลบส่วนโหลดซ้ำ)
 
       alert('บันทึกแบบร่างสำเร็จ');
+
+      // ⭐️ (สำคัญ) โหลดหน้าซ้ำหลังจากบันทึกสำเร็จ
+      // เพื่อให้เห็นรูปที่อัปโหลด (จาก DB) และเคลียร์ State
+      window.location.reload();
+
     } catch (err) {
       console.error('Save draft failed:', err);
       alert('บันทึกแบบร่างไม่สำเร็จ');
@@ -453,6 +378,7 @@ const ClaimDetail = () => {
     }
   };
 
+  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -467,39 +393,47 @@ const ClaimDetail = () => {
       setSaving(true);
       setSubmitType('submit');
 
-      const body = {
-        damageDescription: reportData.damageDescription || '',
-        inspectionDate: buildInspectionDateTime(),
+      // 1. สร้าง FormData
+      const formData = new FormData();
 
-        // (โค้ดในไฟล์ของคุณถูกต้องแล้ว)
-        photosToCreate: (images || [])
-            .filter(x => !x.existing && x.tempFileName)
-            .map(x => ({
-              tempFileName: x.tempFileName,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
-        photosToUpdate: (images || [])
-            .filter(x => x.existing)
-            .map(x => ({
-              _id: x._id,
-              type: x.type || 'damage',
-              caption: x.caption || '',
-            })),
+      // 2. แยกรูปใหม่ (ที่มี File) และรูปเก่า
+      const newImages = images.filter(x => !x.existing && x.file);
+      const photosToUpdate = images.filter(x => x.existing);
 
-        repairItems: (reportData.repairItems || []).map(x => ({
-          _id: x.existing ? x._id : null,
-          type: x.type,
-          cost: Number(x.cost) || 0,
-          customDescription: x.customDescription || '',
-        })),
-        mode: 'submit',
-      };
+      // 3. ใส่ข้อมูล Text (และ JSON ที่แปลงเป็น String)
+      formData.append("damageDescription", reportData.damageDescription || '');
+      formData.append("inspectionDate", buildInspectionDateTime());
+      formData.append("mode", "submit"); // ⭐️ (ต่างกันตรงนี้)
 
-      await axios.post(`http://localhost:3000/api/claims/save/${id}`, body);
+      formData.append("photosToUpdate", JSON.stringify(
+          photosToUpdate.map(p => ({ _id: p._id, type: p.type, caption: p.caption }))
+      ));
+
+      formData.append("repairItems", JSON.stringify(
+          reportData.repairItems.map(x => ({
+            _id: x.existing ? x._id : null,
+            type: x.type,
+            cost: Number(x.cost) || 0,
+            customDescription: x.customDescription || '',
+          }))
+      ));
+
+      // 4. ใส่ไฟล์ใหม่ (และ Metadata) เป็น Array คู่ขนาน
+      newImages.forEach(img => {
+        formData.append("newPhotos", img.file, img.fileName); // File
+        formData.append("newPhotoCaptions", img.caption); // String
+        formData.append("newPhotoTypes", img.type);     // String
+      });
+
+      // 5. ส่ง Request แบบ multipart/form-data
+      await axios.post(
+          `http://localhost:3000/api/claims/save/${id}`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+      );
 
       setShowSuccessModal(true);
-    } catch (err) { // <--- ✅ แก้ไข Syntax Error ตรงนี้
+    } catch (err) {
       console.error('Submit failed:', err);
       alert('ส่งออกไม่สำเร็จ');
     } finally {
@@ -518,6 +452,7 @@ const ClaimDetail = () => {
   };
 
   // ====== UI เดิมทั้งหมดด้านล่าง — ไม่แก้ layout/คลาส/โครง DOM ======
+  // (isUploading ถูกลบออกจาก <button> (บรรทัด 724, 741) เพราะเราไม่อัปโหลดทันที)
 
   if (loading) {
     return (
@@ -817,8 +752,7 @@ const ClaimDetail = () => {
                   <button
                       type="submit"
                       className="btn-primary w-full flex items-center justify-center gap-2"
-                      // ✅ FIX #4: เพิ่ม isUploading
-                      disabled={saving || isUploading}
+                      disabled={saving} // ⭐️ ลบ isUploading
                   >
                     {saving && submitType === 'submit' ? (
                         <>
@@ -837,8 +771,7 @@ const ClaimDetail = () => {
                       type="button"
                       onClick={handleSaveDraft}
                       className="btn-primary w-full flex items-center justify-center gap-2"
-                      // ✅ FIX #4: เพิ่ม isUploading
-                      disabled={saving || isUploading}
+                      disabled={saving} // ⭐️ ลบ isUploading
                   >
                     {saving && submitType === 'draft' ? (
                         <>
