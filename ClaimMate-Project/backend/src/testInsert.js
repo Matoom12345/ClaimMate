@@ -72,7 +72,7 @@ dotenv.config();
                 brand: 'Toyota', model: 'Corolla', year: '2022',
                 licensePlate: 'กข 1234', color: 'White',
                 engineID: 'ENG-001', policyNumber: 'POL-001',
-                insuranceLevel: 1, insuranceBalance: 100000,
+                insuranceLevel: '1', insuranceBalance: 1000000,
                 insuranceCreateAt: "2025-10-20",
                 insuranceExpireAt: "2030-10-20"
             },
@@ -81,7 +81,7 @@ dotenv.config();
                 brand: 'Honda', model: 'Civic', year: '2020',
                 licensePlate: 'ขง 5678', color: 'Black',
                 engineID: 'ENG-002', policyNumber: 'POL-002',
-                insuranceLevel: 2, insuranceBalance: 50000,
+                insuranceLevel: '2+', insuranceBalance: 500000,
                 insuranceCreateAt: "2028-11-21",
                 insuranceExpireAt: "2033-11-21"
             },
@@ -90,7 +90,7 @@ dotenv.config();
                 brand: 'Mazda', model: '3', year: '2018',
                 licensePlate: 'คจ 8888', color: 'Red',
                 engineID: 'ENG-003', policyNumber: 'POL-003',
-                insuranceLevel: 1, insuranceBalance: 100000,
+                insuranceLevel: '3', insuranceBalance: 100000,
                 insuranceCreateAt: "2027-09-26",
                 insuranceExpireAt: "2032-09-26"
             }

@@ -342,6 +342,23 @@ router.get("/customer/:customerID/stats", async (req, res) => {
     }
 });
 
+// (Endpoint นี้สำหรับ Navbar ของ Insurance โดยเฉพาะ)
+router.get("/stats/insurance-pending", async (req, res) => {
+    try {
+        // นับจำนวนเคสที่ "กำลังดำเนินการ" (currentStep <= 2) และยังไม่ปิด
+        const pendingCount = await Claim.countDocuments({
+            currentStep: { $lte: 2 },
+            isClosed: false
+        });
+
+        res.json({ success: true, pendingCount });
+
+    } catch (err) {
+        console.error("Error fetching insurance pending stats:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
 /* =====================================================
    ✅ ⭐️ NEW ⭐️) Customer → เคลมที่กำลังซ่อม (state: 'repair')
 ===================================================== */

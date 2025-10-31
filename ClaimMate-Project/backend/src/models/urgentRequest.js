@@ -5,6 +5,8 @@ const urgentRequestSchema = new mongoose.Schema({
     type: { type: String, required: true },
     detail: { type: String, required: true},
     fileURL: { type: String, required: true },
+    status:      { type:String, enum:['pending','approved','rejected'], default:'pending', required:true },
+    rejectedDetail: { type: String, default: null }
 }, {
     timestamps: true
 });

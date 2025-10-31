@@ -208,7 +208,7 @@ const ActiveClaims = () => {
                             <h3 className="text-lg font-semibold text-neutral-dark">
                               {claim.claimNumber}
                             </h3>
-                            {getPriorityBadge(claim.priority)}
+                            {getPriorityBadge(claim.priorityLevel)}
                           </div>
 
                           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${statusConfig.bgColor}`}>

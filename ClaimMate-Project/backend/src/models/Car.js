@@ -12,7 +12,7 @@ const carSchema = new mongoose.Schema({
     engineID:        { type: String, required: true, unique: true },
 
     policyNumber:    { type: String, required: true, unique: true },
-    insuranceLevel:  { type: Number, enum: [1, 2, 3], required: true },
+    insuranceLevel:  { type:String, enum:['1','2','3','2+','3+'], required:true },
     insuranceBalance:{ type: Number, required: true },
     insuranceCreateAt:{ type:String, required:true,  match:[/^\d{4}-\d{2}-\d{2}$/,'Invalid date format'] },
     insuranceExpireAt:{ type:String, required:true,  match:[/^\d{4}-\d{2}-\d{2}$/,'Invalid date format'] },
