@@ -26,9 +26,12 @@ const GarageDashboard = () => {
           completedToday: 3,
         },
         activeRepairsList: [
-          { id: 'R-2024-001', carModel: 'Toyota Camry 2020', licensePlate: 'กข 1234', progress: 65, estimatedCompletion: '2024-10-28', status: 'repairing' },
-          { id: 'R-2024-002', carModel: 'Honda Civic 2021', licensePlate: 'ฮค 5678', progress: 30, estimatedCompletion: '2024-10-30', status: 'parts_ordered' },
-          { id: 'R-2024-004', carModel: 'Ford Ranger 2022', licensePlate: 'จจ 4321', progress: 95, estimatedCompletion: '2024-10-27', status: 'quality_check' },
+          // ✅ (แก้ไข) ปรับสถานะสำหรับรายการติดตามให้ใช้ 'inprogress'
+          { id: 'R-2024-001', carModel: 'Toyota Camry 2020', licensePlate: 'กข 1234', progress: 65, estimatedCompletion: '2024-10-28', status: 'inprogress' },
+          // ✅ (แก้ไข) ปรับสถานะสำหรับรายการติดตามให้ใช้ 'inprogress'
+          { id: 'R-2024-002', carModel: 'Honda Civic 2021', licensePlate: 'ฮค 5678', progress: 30, estimatedCompletion: '2024-10-30', status: 'inprogress' },
+          // ✅ (เพิ่ม) สถานะ 'completed'
+          { id: 'R-2024-003', carModel: 'Mazda 3 2019', licensePlate: 'นก 4321', progress: 100, estimatedCompletion: '2024-10-24', status: 'completed' },
         ],
         recentApprovals: [
           { id: 'APR-2024-001', claimId: 'CLM-2024-008', carModel: 'Toyota Camry 2020', type: 'pending' },
@@ -41,9 +44,11 @@ const GarageDashboard = () => {
 
   const getStatusConfig = (status) => {
     const config = {
-      repairing: { label: 'กำลังซ่อม', color: 'primary', icon: 'build' },
-      parts_ordered: { label: 'สั่งอะไหล่', color: 'info', icon: 'inventory_2' },
-      quality_check: { label: 'ตรวจสอบคุณภาพ', color: 'secondary', icon: 'verified' },
+      // ✅ (แก้ไข) สถานะสำหรับงานซ่อมที่ต้องติดตาม
+      inprogress: { label: 'กำลังซ่อม', color: 'warning', icon: 'build' },
+      completed: { label: 'เสร็จสิ้น', color: 'success', icon: 'task_alt' },
+      
+      // สถานะสำหรับ Approvals (คงเดิม)
       pending: { label: 'รออนุมัติ', color: 'warning', icon: 'pending' },
       approved: { label: 'อนุมัติแล้ว', color: 'success', icon: 'check_circle' },
     };
@@ -150,8 +155,9 @@ const GarageDashboard = () => {
               const config = getStatusConfig(repair.status);
               return (
                 <Link to={`/garage/repairs/${repair.id}`} key={repair.id} className="card-static p-4 hover:bg-neutral-50 flex items-center gap-4 transition-colors">
-                  <div className={`w-12 h-12 rounded-xl ${config.color === 'primary' ? 'bg-primary-100' : config.color === 'secondary' ? 'bg-secondary-100' : 'bg-warning/20'} flex items-center justify-center`}>
-                    <span className={`material-icons-round text-2xl text-${config.color}-600`}>{config.icon}</span>
+                  {/* ✅ (แก้ไข) ปรับให้ใช้ config.color เพื่อกำหนดสีพื้นหลังและสีไอคอน */}
+                  <div className={`w-12 h-12 rounded-xl bg-${config.color}/20 flex items-center justify-center`}>
+                    <span className={`material-icons-round text-2xl text-${config.color}`}>{config.icon}</span>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">

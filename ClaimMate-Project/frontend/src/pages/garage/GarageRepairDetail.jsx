@@ -206,20 +206,6 @@ const GarageRepairDetail = () => {
                     </div>
                 </div>
             </div>
-            
-            {/* Progress Bar */}
-            <Card className="p-4">
-                <div className="flex items-center justify-between text-sm text-neutral-500 mb-2">
-                    <span>ความคืบหน้าโดยรวม</span>
-                    <span className="font-semibold text-neutral-dark">{repair.progress}%</span>
-                </div>
-                <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                      style={{ width: `${repair.progress}%` }}
-                    />
-                </div>
-            </Card>
 
             {/* Item Status Update */}
             <div className="card-static">

@@ -265,20 +265,6 @@ const GarageRepairs = () => {
                   </div>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs text-neutral-500 mb-2">
-                    <span>ความคืบหน้า</span>
-                    <span className="font-semibold text-neutral-dark">{repair.progress}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                      style={{ width: `${repair.progress}%` }}
-                    />
-                  </div>
-                </div>
-
                 {/* Repair Items */}
                 <div className="mb-4 p-4 bg-neutral-50 rounded-lg">
                   <h4 className="text-sm font-semibold text-neutral-700 mb-3">
