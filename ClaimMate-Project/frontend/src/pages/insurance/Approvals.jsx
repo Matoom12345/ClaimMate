@@ -25,18 +25,20 @@ import { Modal, TextArea } from '../../components';
 const Approvals = () => {
   const [activeTab, setActiveTab] = useState('customer'); // 'customer', 'garage', 'history'
   const [loading, setLoading] = useState(true);
-  const [approvals, setApprovals] = useState({ 
-    customer: [], 
+  const [approvals, setApprovals] = useState({
+    customer: [],
     garage: [],
-    history: [] 
+    history: []
   });
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [actionType, setActionType] = useState(null); // 'approve' or 'reject'
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
-  
+
   // ⭐ Search & Filter for History
   const [searchTerm, setSearchTerm] = useState('');
   const [historyFilter, setHistoryFilter] = useState('all'); // 'all', 'approved', 'rejected'
@@ -57,7 +59,8 @@ const Approvals = () => {
             licensePlate: 'กข 1234 กรุงเทพ',
             reason: 'work',
             description: 'ต้องใช้รถเพื่อการทำงานเร่งด่วน ไม่สามารถรอได้',
-            attachments: ['document1.pdf'],
+            attachments: ['https://picsum.photos/800/600?random=1', // รูปภาพหลัก
+              'https://picsum.photos/400/300?random=2',], // mock นะ
             requestedDate: '2024-10-26 09:30',
             status: 'pending',
             garageName: 'อู่สมชาย ห้วยขวาง', // อู่ที่จะส่งต่อไป
@@ -167,19 +170,24 @@ const Approvals = () => {
     setShowConfirmModal(true);
   };
 
+  const handleImagePreview = (url) => {
+    setImagePreviewUrl(url);
+    setShowImageModal(true);
+  };
+
   const confirmAction = async () => {
     if (actionType === 'reject' && (!rejectReason || rejectReason.trim().length < 10)) {
       alert('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
       return;
     }
-    
+
     setProcessing(true);
-    
+
     // TODO: Backend - อนุมัติ/ปฏิเสธ
     setTimeout(() => {
       const isCustomer = selectedApproval.type === 'urgent_repair';
       const sourceTab = isCustomer ? 'customer' : 'garage';
-      
+
       let historyItem = {
         ...selectedApproval,
         status: actionType === 'approve' ? 'approved' : 'rejected',
@@ -207,7 +215,7 @@ const Approvals = () => {
       } else {
         // Reject
         historyItem.rejectReason = rejectReason;
-        
+
         if (isCustomer) {
           // ปฏิเสธคำขอซ่อมด่วนจากลูกค้า → จบ
           console.log('❌ ปฏิเสธคำขอซ่อมด่วน → แจ้งลูกค้า');
@@ -217,14 +225,14 @@ const Approvals = () => {
           console.log('❌ ปฏิเสธรายการเพิ่มเติม → ลูกค้าต้องจ่ายเพิ่ม:', selectedApproval.additionalAmount, 'บาท');
         }
       }
-      
+
       // ย้ายไปประวัติ
       setApprovals(prev => ({
         ...prev,
         [sourceTab]: prev[sourceTab].filter(a => a.id !== selectedApproval.id),
         history: [historyItem, ...prev.history],
       }));
-      
+
       setProcessing(false);
       setShowConfirmModal(false);
       alert(actionType === 'approve' ? 'อนุมัติสำเร็จ' : 'ปฏิเสธสำเร็จ');
@@ -251,14 +259,14 @@ const Approvals = () => {
         </span>
       );
     }
-    
+
     const config = {
       pending: { label: 'รออนุมัติ', color: 'warning', icon: 'schedule' },
       approved: { label: 'อนุมัติแล้ว', color: 'success', icon: 'check_circle' },
       rejected: { label: 'ปฏิเสธแล้ว', color: 'error', icon: 'cancel' },
     };
     const { label, color, icon } = config[status] || config.pending;
-    
+
     return (
       <span className={`badge badge-${color} flex items-center gap-1`}>
         <span className="material-icons-round text-xs">{icon}</span>
@@ -272,10 +280,10 @@ const Approvals = () => {
     // Filter by status
     if (historyFilter === 'approved' && approval.status !== 'approved') return false;
     if (historyFilter === 'rejected' && approval.status !== 'rejected') return false;
-    
+
     // Search
     if (!searchTerm) return true;
-    
+
     const term = searchTerm.toLowerCase();
     return (
       approval.claimNumber.toLowerCase().includes(term) ||
@@ -369,7 +377,7 @@ const Approvals = () => {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"></div>
             )}
           </button>
-          
+
           <button
             onClick={() => setActiveTab('garage')}
             className={`relative pb-4 px-2 font-medium transition-colors duration-300 flex items-center gap-2 ${activeTab === 'garage' ? 'text-primary-600' : 'text-neutral-500 hover:text-neutral-700'}`}
@@ -383,7 +391,7 @@ const Approvals = () => {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"></div>
             )}
           </button>
-          
+
           <button
             onClick={() => setActiveTab('history')}
             className={`relative pb-4 px-2 font-medium transition-colors duration-300 flex items-center gap-2 ${activeTab === 'history' ? 'text-primary-600' : 'text-neutral-500 hover:text-neutral-700'}`}
@@ -455,8 +463,8 @@ const Approvals = () => {
           </p>
           <p className="text-neutral-400 text-sm">
             {activeTab === 'customer' ? 'ไม่มีคำขออนุมัติจากลูกค้าในขณะนี้' :
-             activeTab === 'garage' ? 'ไม่มีคำขออนุมัติจากอู่ในขณะนี้' :
-             searchTerm ? 'ลองเปลี่ยนคำค้นหาหรือ filter' : 'ประวัติการอนุมัติ/ปฏิเสธจะแสดงที่นี่'}
+              activeTab === 'garage' ? 'ไม่มีคำขออนุมัติจากอู่ในขณะนี้' :
+                searchTerm ? 'ลองเปลี่ยนคำค้นหาหรือ filter' : 'ประวัติการอนุมัติ/ปฏิเสธจะแสดงที่นี่'}
           </p>
         </div>
       ) : (
@@ -619,7 +627,7 @@ const Approvals = () => {
                     <span className="material-icons-round text-xs align-middle mr-1">
                       {approval.status === 'approved' ? 'check_circle' : 'cancel'}
                     </span>
-                    {approval.status === 'approved' ? 'อนุมัติโดย' : 'ปฏิเสธโดย'}: 
+                    {approval.status === 'approved' ? 'อนุมัติโดย' : 'ปฏิเสธโดย'}:
                     <strong> {approval.approvedBy || approval.rejectedBy}</strong>
                     {' '}• {approval.approvedDate || approval.rejectedDate}
                   </p>
@@ -682,9 +690,10 @@ const Approvals = () => {
                 {selectedApproval.claimNumber}
               </Link>
             </div>
-            
+
             {selectedApproval.type === 'urgent_repair' ? (
               <>
+
                 <div>
                   <p className="text-sm text-neutral-500 mb-1">ลูกค้า</p>
                   <p className="font-medium">{selectedApproval.customerName}</p>
@@ -711,6 +720,29 @@ const Approvals = () => {
                   <p className="text-sm text-neutral-500 mb-1">รายละเอียด</p>
                   <p className="text-neutral-700">{selectedApproval.description}</p>
                 </div>
+                {/* ⭐️ (เพิ่ม) ส่วนแสดงรูปภาพและลิงก์ */}
+                {selectedApproval.attachments && selectedApproval.attachments.length > 0 && (
+                  <div>
+                    <p className="text-sm text-neutral-500 mb-2">เอกสาร/รูปภาพประกอบ</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {selectedApproval.attachments.map((url, index) => (
+                        <div key={index}
+                          onClick={() => handleImagePreview(url)}
+                          className="relative w-full aspect-square rounded-lg overflow-hidden cursor-pointer group hover:opacity-90 transition-opacity duration-200"
+                        >
+                          <img
+                            src={url}
+                            alt={`Attachment ${index + 1}`}
+                            className="object-cover w-full h-full"
+                          />
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <span className="material-icons-round text-white text-3xl">zoom_in</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -790,7 +822,7 @@ const Approvals = () => {
                   คุณแน่ใจหรือไม่ที่จะอนุมัติคำขอนี้?
                 </p>
               </div>
-              
+
               {selectedApproval?.type === 'urgent_repair' && (
                 <div className="p-4 bg-blue-50 rounded">
                   <p className="text-sm text-info mb-2">
@@ -804,14 +836,14 @@ const Approvals = () => {
                   </p>
                 </div>
               )}
-              
+
               {selectedApproval?.type === 'additional_cost' && (
                 <div className="p-4 bg-blue-50 rounded">
                   <p className="text-sm text-info mb-2">
                     <strong>หมายเหตุ:</strong>
                   </p>
                   <p className="text-sm text-neutral-700">
-                    • วงเงินจะเพิ่มจาก ฿{selectedApproval.currentUsed.toLocaleString()} 
+                    • วงเงินจะเพิ่มจาก ฿{selectedApproval.currentUsed.toLocaleString()}
                     {' '}→ ฿{selectedApproval.totalAmount.toLocaleString()}
                   </p>
                 </div>
@@ -826,7 +858,7 @@ const Approvals = () => {
                   {selectedApproval?.type === 'urgent_repair' ? 'ลูกค้า' : 'อู่'}ทราบ
                 </p>
               </div>
-              
+
               {selectedApproval?.type === 'additional_cost' && (
                 <div className="p-4 bg-amber-50 rounded">
                   <p className="text-sm text-warning mb-2">
@@ -840,7 +872,7 @@ const Approvals = () => {
                   </p>
                 </div>
               )}
-              
+
               <TextArea
                 label="เหตุผลในการปฏิเสธ"
                 value={rejectReason}
@@ -853,6 +885,32 @@ const Approvals = () => {
           )}
         </div>
       </Modal>
+      <Modal
+        isOpen={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        title="รายละเอียดรูปภาพ"
+        size="2xl" // ปรับขนาดให้ใหญ่ขึ้นสำหรับรูปภาพ
+        className="!p-0" // ลบ padding ออกจาก Modal content
+        contentClassName="!p-0"
+      >
+        {imagePreviewUrl && (
+          <div className="relative w-full h-[80vh] overflow-hidden">
+            <img
+              src={imagePreviewUrl}
+              alt="Attachment Preview"
+              className="object-contain w-full h-full"
+            />
+            {/* ⭐️ (เพิ่ม) ปุ่มปิดตามรูปตัวอย่าง (ตำแหน่งขวาบน) */}
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            >
+              <span className="material-icons-round">close</span>
+            </button>
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 };
