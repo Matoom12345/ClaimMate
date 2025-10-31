@@ -19,20 +19,34 @@ const ActiveClaims = () => {
     { value: 'pending_report', label: 'รอส่งรายงาน', icon: 'upload_file', color: 'info' },
   ];
 
-  const [latestDates, setLatestDates] = useState({});
+  // ⭐️ (แก้ไข) ลบ State ที่ไม่ได้ใช้ออก
+  // const [latestDates, setLatestDates] = useState({});
 
   useEffect(() => {
     const fetchActiveClaims = async () => {
       try {
-        const insuranceID = localStorage.getItem("insuranceID");
-        const res = await axios.get('http://localhost:3000/api/claims/all', {
+        // 1. ดึง Object "claimmate_user"
+        const user = JSON.parse(localStorage.getItem("claimmate_user"));
+        // 2. ดึง insuranceID จาก Object นั้น
+        const insuranceID = user?.insuranceID;
+
+        if (!insuranceID) {
+          console.error("ActiveClaims: ไม่พบ insuranceID ใน localStorage.");
+          throw new Error("insuranceID is required");
+        }
+
+        const res = await axios.get('http://localhost:3000/api/claims/active', {
           params: { insuranceID }
         });
+
+        // ⭐️ (แก้ไข) res.data คือ Array ที่ได้จาก Backend โดยตรง
+        // (Backend ไม่ได้ห่อด้วย { success: true, claims: ... })
         const claimsData = res.data;
         setClaims(claimsData);
 
-        const mergedDates = Object.assign({}, ...latestDates);
-        setLatestDates(mergedDates);
+        // ⭐️ (แก้ไข) ลบ 2 บรรทัดที่เป็นปัญหา (mergedDates) ออก
+        // const mergedDates = Object.assign({}, ...latestDates);
+        // setLatestDates(mergedDates);
 
       } catch (err) {
         console.error('Fetch error:', err);
@@ -42,7 +56,7 @@ const ActiveClaims = () => {
     };
 
     fetchActiveClaims();
-  }, []);
+  }, []); // ⭐️ (Dependency Array ว่าง ถูกต้องแล้ว)
 
   const filteredClaims = claims.filter(claim => {
     if (filterStatus !== 'all' && claim.status !== filterStatus) {
