@@ -35,7 +35,6 @@ router.post("/", async (req, res) => {
             customerID,
             insuranceID,
             carID,
-            title,
             location,
             detail,
             priorityLevel,
@@ -44,7 +43,7 @@ router.post("/", async (req, res) => {
         } = req.body;
 
         // ตรวจข้อมูล
-        if (!customerID || !insuranceID || !carID || !title || !location || !detail) {
+        if (!customerID || !insuranceID || !carID || !location || !detail) {
             return res.status(400).json({ success: false, message: "ข้อมูลไม่ครบ" });
         }
 
@@ -66,7 +65,6 @@ router.post("/", async (req, res) => {
             customerID,
             insuranceID,
             carID,
-            title,
             location,
             detail,
             priorityLevel,
@@ -139,7 +137,6 @@ router.get("/all", async (req, res) => {
                 $project: {
                     id: "$_id",
                     claimNumber: 1,
-                    title: 1,
                     detail: 1,
                     location: 1,
                     state: 1,
@@ -213,7 +210,7 @@ router.get("/active", async (req, res) => {
             return res.status(400).json({ message: "insuranceID is required" });
 
         const active = await Claim.aggregate([
-            { $match: { insuranceID, isClosed: false } },
+            { $match: { insuranceID, isClosed: false, currentStep: { $lt: 2 } } },
 
             {
                 $lookup: {
@@ -239,7 +236,6 @@ router.get("/active", async (req, res) => {
                 $project: {
                     id: "$_id",
                     claimNumber: 1,
-                    title: 1,
                     status: 1,
                     priorityLevel: 1,
                     currentStep: 1,
@@ -296,7 +292,6 @@ router.get("/customer/:customerID", async (req, res) => {
                 $project: {
                     _id: 1,
                     claimNumber: 1,
-                    title: 1,
                     incidentDate: 1,
                     state: 1,
                     currentStep: 1,
@@ -468,7 +463,6 @@ router.get("/detail/:claimNumber", async (req, res) => {
 
                     // claim info
                     claimNumber: 1,
-                    title: 1,
                     detail: 1,
                     location: 1,
                     state: 1,
@@ -863,11 +857,12 @@ router.post(
         try {
             const { claimNumber } = req.params;
 
-            // ⭐️ 2. ดึงข้อมูล Text Fields และ Parse JSON
+            // ⭐️ 2. (แก้ไข) ดึงข้อมูล Text Fields และ Parse JSON (เพิ่ม additionalCost)
             const {
                 damageDescription,
                 inspectionDate,
-                mode
+                mode,
+                additionalCost // ⭐️ (เพิ่ม) รับค่านี้
             } = req.body;
 
             // (ข้อมูล Array ที่ส่งมาเป็น JSON string)
@@ -892,13 +887,34 @@ router.post(
 
             claim.detail = damageDescription;
             claim.inspectionDate = inspectionDate;
-            claim.status = "inspecting"
-            //claim.estimatedCost = tota
+            claim.status = "inspecting";
 
+            // ⭐️ (เพิ่ม) บันทึก additionalCost เสมอ (ไม่ว่าจะ draft หรือ submit)
+            // (field นี้มีใน Model แล้ว)
+            const costDifference = Number(additionalCost) || 0;
+            claim.additionalCost = costDifference;
+
+            // ⭐️ 5. (แก้ไข) Logic การเปลี่ยน State ตามเงื่อนไข
             if (mode === "submit") {
-                claim.state = "survey";
-                claim.currentStep = 2;
-                claim.estimatedCost = await calculateTotalCost(claim.claimNumber);
+
+                // ⭐️ (Logic ใหม่)
+                if (costDifference > 0) {
+                    // (มีส่วนต่าง ➔ ส่งให้ลูกค้าอนุมัติ)
+                    claim.state = "survey";
+                    claim.currentStep = 2; // (รอ Survey/ลูกค้ายืนยัน)
+                } else {
+                    // (ไม่มีส่วนต่าง ➔ อนุมัติเลย)
+                    claim.state = "approved";
+                    claim.currentStep = 3; // (อนุมัติแล้ว/รอเลือกอู่)
+                    claim.approvalDate = new Date().toISOString().slice(0, 16).replace("T", " ");
+                }
+
+                claim.estimatedCost = await calculateTotalCost(claimNumber);
+
+            } else {
+                // (mode === 'draft')
+                // (คำนวณ estimatedCost ไว้ แต่ไม่เปลี่ยน state/step)
+                claim.estimatedCost = await calculateTotalCost(claimNumber);
             }
 
             console.log("[SAVE] 2. Saving claim details...");
@@ -965,6 +981,13 @@ router.post(
                 }
             }
             console.log("[SAVE] 8. RepairItems SAVED.");
+
+            // ⭐️ (ย้าย) อัปเดต estimatedCost (หลังจาก RepairItems ถูกบันทึก)
+            const finalTotalCost = await calculateTotalCost(claimNumber);
+            claim.estimatedCost = finalTotalCost;
+            await claim.save();
+            console.log("[SAVE] 9. Final estimatedCost SAVED.");
+
 
             return res.json({ success: true });
 

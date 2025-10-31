@@ -648,7 +648,7 @@ const Approvals = () => {
                     className="btn-outline flex-1 flex items-center justify-center gap-2 !border-error !text-error hover:!bg-red-50"
                   >
                     <span className="material-icons-round text-sm">close</span>
-                    <span>ปฏิเสธ</span>
+                    <span>เกินวงเงิน ส่งขอความยินยอมจากลุกค้า</span>
                   </button>
                   <button
                     onClick={() => handleApprove(approval)}

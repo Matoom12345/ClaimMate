@@ -8,7 +8,6 @@ const claimSchema = new mongoose.Schema({
     insuranceID: { type:String, required:true },   // E00001
     garageID:    { type:String, default:null },
     carID:       { type:String, required:true },   // CAR-00001
-    title:       { type:String, required:true },
     location:    { type:String, required:true },
     detail:      { type:String, required:true },
     currentStep: { type:Number, default:1 },

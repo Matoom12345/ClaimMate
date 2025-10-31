@@ -113,7 +113,6 @@ dotenv.config();
                 customerID: insertedCustomers[0].customerID,  // หรือ _id
                 insuranceID: insertedInsurances[0].insuranceID,  // หรือ _id
                 carID:      insertedCars[0].carID, // ตาม schema
-                title: 'ชนคับพี่ช่วยด้วยจัฟ',
                 location: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร 10310',
                 detail: 'ชนด้านหน้าจากรถที่วิ่งสวนทาง ความเสียหายบริเวณกันชนหน้า ไฟหน้า และฝากระโปรงหน้า',
                 currentStep: 1,
