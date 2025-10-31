@@ -842,6 +842,51 @@ router.get("/full-detail/:claimNumber", async (req, res) => {
     }
 });
 
+
+// ⭐️⭐️⭐️ (โค้ดใหม่ที่เพิ่มเข้ามา) ⭐️⭐️⭐️
+/* =====================================================
+   ✅ (NEW) Customer → ยืนยันรับผิดชอบส่วนเกิน (accept-extra-cost)
+===================================================== */
+router.post("/:claimNumber/accept-extra-cost", async (req, res) => {
+    try {
+        const { claimNumber } = req.params;
+        const { extraCost } = req.body; // (รับค่าส่วนเกินที่คำนวณจาก Frontend)
+
+        console.log(`[ACCEPT EXTRA COST /${claimNumber}] Customer accepted:`, extraCost);
+
+        const claim = await Claim.findOne({ claimNumber });
+        if (!claim) {
+            return res.status(404).json({ success: false, message: "Claim not found" });
+        }
+
+        // (คำนวณยอดรวมจาก DB อีกครั้งเพื่อความปลอดภัย)
+        const estimatedCost = await calculateTotalCost(claimNumber);
+
+        const calculatedExtraCost = Number(extraCost) || 0;
+
+        // (คำนวณยอดที่ประกันอนุมัติ = ยอดรวม - ส่วนเกิน)
+        const approvedCost = estimatedCost - calculatedExtraCost;
+
+        // (อัปเดต Claim ตามที่ร้องขอ)
+        claim.state = "approved";
+        claim.currentStep = 3;
+        claim.approvedCost = approvedCost;       // ยอดที่ประกันจ่าย
+        claim.additionalCost = calculatedExtraCost; // ยอดส่วนเกินที่ลูกค้ายอมรับ
+        claim.approvalDate = new Date().toISOString().slice(0, 16).replace("T", " ");
+
+        await claim.save();
+        console.log(`[ACCEPT EXTRA COST /${claimNumber}] Claim state updated to 'approved'`);
+
+        res.json({ success: true, claim: claim });
+
+    } catch (err) {
+        console.error("Accept extra cost error:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+// ⭐️⭐️⭐️ (จบโค้ดใหม่) ⭐️⭐️⭐️
+
+
 /* =====================================================
 ✅ 14) SAVE DRAFT / SUBMIT (Frontend เรียกตัวนี้)
    ⭐️⭐️⭐️ (โค้ดใหม่ทั้งหมด) ⭐️⭐️⭐️
@@ -907,6 +952,10 @@ router.post(
                     claim.state = "approved";
                     claim.currentStep = 3; // (อนุมัติแล้ว/รอเลือกอู่)
                     claim.approvalDate = new Date().toISOString().slice(0, 16).replace("T", " ");
+
+                    // (ถ้าอนุมัติเลย ยอดอนุมัติ = ยอดรวม, ส่วนเกิน = 0)
+                    claim.approvedCost = await calculateTotalCost(claimNumber);
+                    claim.additionalCost = 0;
                 }
 
                 claim.estimatedCost = await calculateTotalCost(claimNumber);
@@ -985,6 +1034,12 @@ router.post(
             // ⭐️ (ย้าย) อัปเดต estimatedCost (หลังจาก RepairItems ถูกบันทึก)
             const finalTotalCost = await calculateTotalCost(claimNumber);
             claim.estimatedCost = finalTotalCost;
+
+            // ⭐️ (อัปเดต) ถ้าอนุมัติเลย (ไม่มีส่วนต่าง) ให้ ApprovedCost = TotalCost
+            if (mode === "submit" && (Number(additionalCost) || 0) <= 0) {
+                claim.approvedCost = finalTotalCost;
+            }
+
             await claim.save();
             console.log("[SAVE] 9. Final estimatedCost SAVED.");
 

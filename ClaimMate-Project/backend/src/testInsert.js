@@ -39,9 +39,9 @@ dotenv.config();
 
         // --- raw data ---
         const customersData = [
-            { firstName: 'Harit',     lastName: 'Manoonnimit',   email: 'harit.man@ku.th',    citizenID: '1869900789127', phoneNumber: '0804484873' },
-            { firstName: 'Dheerawat', lastName: 'Wongkhunmuang', email: 'dhee.won@ku.th',     citizenID: '1869903781946', phoneNumber: '0964403868' },
-            { firstName: 'Jinnaphat', lastName: 'Theparat',      email: 'jinnaphat.th@ku.th',      citizenID: '1869976496127', phoneNumber: '0996184224' },
+            { firstName: 'หฤษฎ์',     lastName: 'มนูญนิมิตร',   email: 'harit.man@ku.th',    citizenID: '1869900789127', phoneNumber: '0804484873' },
+            { firstName: 'สมหมาย', lastName: 'กายา', email: 'dhee.won@ku.th',     citizenID: '1869903781946', phoneNumber: '0964403868' },
+            { firstName: 'จันศรี', lastName: 'มีชัย',      email: 'jinnaphat.th@ku.th',      citizenID: '1869976496127', phoneNumber: '0996184224' },
 
         ];
         const garagesData = [
@@ -49,8 +49,8 @@ dotenv.config();
             { firstName: 'Jae',  lastName: 'Pingpong',  email: 'saniatheparat@gmail.com', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
         ];
         const insurancesData = [
-            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th', phoneNumber: '0964403868' },
-            { firstName: 'GGKUB', lastName: 'EZPEE', email: 'nambnanenia@gmail.com', phoneNumber: '0804474765' }
+            { firstName: 'พิมมา', lastName: 'ก้าวไหล', email: 'jidapa.mah@ku.th', phoneNumber: '0964403868' },
+            { firstName: 'สมศรี', lastName: 'ดีเสมอ', email: 'nambnanenia@gmail.com', phoneNumber: '0804474765' }
         ];
 
         // ❗ ห้ามใช้ insertMany กับโมเดลที่มี pre-hook gen id
@@ -70,7 +70,7 @@ dotenv.config();
             {
                 customerID: insertedCustomers[0].customerID, // หรือ ._id ถ้า schema เป็น ObjectId
                 brand: 'Toyota', model: 'Corolla', year: '2022',
-                licensePlate: 'กข 1234', color: 'White',
+                licensePlate: 'กข 1234', color: 'ขาว',
                 engineID: 'ENG-001', policyNumber: 'POL-001',
                 insuranceLevel: '1', insuranceBalance: 1000000,
                 insuranceCreateAt: "2025-10-20",
@@ -79,7 +79,7 @@ dotenv.config();
             {
                 customerID: insertedCustomers[0].customerID,
                 brand: 'Honda', model: 'Civic', year: '2020',
-                licensePlate: 'ขง 5678', color: 'Black',
+                licensePlate: 'ขง 5678', color: 'ดำ',
                 engineID: 'ENG-002', policyNumber: 'POL-002',
                 insuranceLevel: '2+', insuranceBalance: 500000,
                 insuranceCreateAt: "2028-11-21",
@@ -88,7 +88,7 @@ dotenv.config();
             {
                 customerID: insertedCustomers[2].customerID,
                 brand: 'Mazda', model: '3', year: '2018',
-                licensePlate: 'คจ 8888', color: 'Red',
+                licensePlate: 'คจ 8888', color: 'แดง',
                 engineID: 'ENG-003', policyNumber: 'POL-003',
                 insuranceLevel: '3', insuranceBalance: 100000,
                 insuranceCreateAt: "2027-09-26",
