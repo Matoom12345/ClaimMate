@@ -84,14 +84,16 @@ router.post('/verify-otp', async (req, res) => {
 
     if (output.role === 'customer') {
         output.customerID = data.customerID;
+        output.citizenID = data.citizenID;
     }
     else if (output.role === 'insurance') {
-        output.insuranceID = data.insuranceID; // ✅ ตอนนี้มีชัวร์
+        output.insuranceID = data.insuranceID;
         output.position = data.position;
     }
     else if (output.role === 'garage') {
         output.garageID = data.garageID;
         output.garageName = data.garageName;
+        output.location = data.location;
     }
 
     console.log("✅ OUTPUT SENT:", output);

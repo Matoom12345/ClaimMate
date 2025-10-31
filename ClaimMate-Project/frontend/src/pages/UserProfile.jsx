@@ -14,23 +14,18 @@ const UserProfile = () => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // TODO: Backend - ดึงข้อมูลผู้ใช้
     setTimeout(() => {
       const stored = localStorage.getItem("claimmate_user");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        
-        // Mock data ตาม role
-        let additionalData = {};
-        
-        if (parsed.role === 'insurance') {
-          additionalData = {
-            employeeId: 'EMP-2024-001',
-          };
-        }
-        
-        setUser({ ...parsed, ...additionalData });
+      if (!stored) {
+        setLoading(false);
+        return;
       }
+
+      const parsed = JSON.parse(stored);
+
+
+
+      setUser({ ...parsed});
       setLoading(false);
     }, 500);
   }, []);
