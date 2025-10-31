@@ -10,6 +10,27 @@ const ClaimDetail = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
 
+  // ✅ ข้อ 5: State สำหรับจัดการ Modal ปฏิเสธรายการ
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [repairItems, setRepairItems] = useState([]);
+
+  // ✅ Priority Badge Helper (ข้อ 1: แสดง priority แทน title)
+  const getPriorityBadge = (priority) => {
+    const config = {
+      urgent: { label: 'ด่วนมาก', color: 'error', icon: 'priority_high' },
+      high: { label: 'ด่วน', color: 'warning', icon: 'arrow_upward' },
+      normal: { label: 'ปกติ', color: 'neutral', icon: 'remove' },
+    };
+    const { label, color, icon } = config[priority] || config.normal;
+
+    return (
+      <span className={`badge badge-${color} badge-sm flex items-center gap-1`}>
+        <span className="material-icons-round text-xs">{icon}</span>
+        {label}
+      </span>
+    );
+  };
+
   useEffect(() => {
     loadClaimData();
   }, [id]);
@@ -17,7 +38,7 @@ const ClaimDetail = () => {
   const loadClaimData = async () => {
     try {
       const res = await axios.get(
-          `http://localhost:3000/api/claims/detail/${id}`
+        `http://localhost:3000/api/claims/detail/${id}`
       );
 
       if (!res.data.claim) {
@@ -40,16 +61,16 @@ const ClaimDetail = () => {
 
       // ✅ garage object (ถ้ามี)
       const garage = c.garageName
-          ? {
-            name: c.garageName,
-            phone: c.garagePhone,
-            email: c.garageEmail,
-            address: "-", // ยังไม่มีใน claimRoute
-            distance: "-", // เว้นไว้ก่อน
-          }
-          : null;
+        ? {
+          name: c.garageName,
+          phone: c.garagePhone,
+          email: c.garageEmail,
+          address: "-", // ยังไม่มีใน claimRoute
+          distance: "-", // เว้นไว้ก่อน
+        }
+        : null;
 
-        // ✅ assigned officer จาก backend
+      // ✅ assigned officer จาก backend
       const assignedOfficer = {
         name: c.insuranceFirstName + " " + c.insuranceLastName || "",
         phone: c.insurancePhone || "",
@@ -66,25 +87,42 @@ const ClaimDetail = () => {
         completedDate: c.completedDate || "",
       };
 
+      // ✅ ข้อ 4: รูปภาพจาก backend (ถ้ามี)
+      const images = c.images || []; // TODO: Backend - ดึงรูปภาพจาก database
+
+      // ✅ ข้อ 5: รายการซ่อม (สำหรับกรณีอนุมัติไม่สำเร็จ)
+      const items = c.repairItems || [
+        { id: 1, name: 'ซ่อมบังโคลนข้าง', cost: 52000 },
+        { id: 2, name: 'เปลี่ยนกับหลัง', cost: 4000 },
+      ]; // TODO: Backend - ดึงรายการซ่อมจาก database
+
+      setRepairItems(items);
+
       setClaim({
         id: c.id,
         claimNumber: c.claimNumber,
-        title: c.title,
+        // title: c.title, // ❌ ลบ title ตามข้อ 1
         detail: c.detail,
         location: c.location,
         status: c.state,
         currentStep: c.currentStep,
+        priority: c.priority || 'normal', // ✅ เพิ่ม priority
 
         incidentDate: c.incidentDate,
         estimatedCost: c.estimatedCost || 0,
         approvedAmount: c.approvedCost || 0,
         deductible: c.additionalCost || 0,
+        insuranceCoverage: c.insuranceCoverage || 25000, // ✅ ข้อ 5: วงเงินประกัน
 
         vehicle,
         garage,
         timeline,
         assignedOfficer,
-        images: [], // ✅ backend ยังไม่มีระบบรูป
+        images, // ✅ ข้อ 4
+
+        // ✅ ข้อ 5: สถานะเคลมไม่สำเร็จ
+        approvalFailed: c.approvalFailed || false,
+        exceedsBudget: c.exceedsBudget || false,
       });
 
       setLoading(false);
@@ -94,6 +132,7 @@ const ClaimDetail = () => {
     }
   };
 
+  // ✅ ข้อ 4: จัดการคลิกรูปภาพ
   const handleImageClick = (image) => {
     setSelectedImage(image);
     setShowImageModal(true);
@@ -103,222 +142,552 @@ const ClaimDetail = () => {
     console.log("Generate PDF Later", id);
   };
 
+  // ✅ ข้อ 2: ตรวจสอบว่าควรแสดงอะไรในส่วนอู่ซ่อม
+  const getGarageDisplay = () => {
+    // ขั้นตอนที่ไม่ควรแสดงอู่: reported, inspected, approved
+    const stepsWithoutGarage = ['reported', 'inspected', 'approved'];
+
+    if (stepsWithoutGarage.includes(claim.currentStep)) {
+      return { show: true, type: 'placeholder', message: '-' };
+    }
+
+    // ขั้นตอน garage_selected: แสดง "เลือกอู่ซ่อม" ถ้ายังไม่เลือก
+    if (claim.currentStep === 'garage_selected' && !claim.garage) {
+      return { show: true, type: 'action', message: 'เลือกอู่ซ่อม' };
+    }
+
+    // ถ้ามีอู่แล้ว แสดงข้อมูลอู่
+    if (claim.garage) {
+      return { show: true, type: 'info', garage: claim.garage };
+    }
+
+    // default
+    return { show: false };
+  };
+
+// ✅ ข้อ 5.1: ยืนยันรับผิดชอบส่วนเกิน
+const handleAcceptExtraCost = async () => {
+  console.log('ยืนยันรับผิดชอบส่วนเกิน');
+  
+  try {
+    // TODO: Backend - บันทึกการยืนยัน และอัปเดตสถานะ
+    await axios.post(`http://localhost:3000/api/claims/${id}/accept-extra-cost`, {
+      extraCost: getExtraCost()
+    });
+    
+    // ✅ อัปเดต UI ทันที (ไม่ต้องรอ reload)
+    setClaim(prev => ({
+      ...prev,
+      deductible: getExtraCost(), // ✅ เพิ่มค่าใช้จ่ายเพิ่มเติม
+      status: 'approved', // ✅ เปลี่ยนสถานะเป็น "อนุมัติเคลม"
+      approvedAmount: getTotalRepairCost() - getExtraCost(), // ✅ จำนวนเงินที่อนุมัติ = ยอดรวม - ส่วนเกิน
+    }));
+    
+    alert('ยืนยันรับผิดชอบส่วนเกินสำเร็จ');
+    
+  } catch (err) {
+    console.error('Accept extra cost failed:', err);
+    alert('เกิดข้อผิดพลาด: ' + (err.response?.data?.message || err.message));
+  }
+};
+
+  // ✅ ข้อ 5.2: ปฏิเสธ - เปิด Modal เลือกรายการ
+  const handleRejectExtraCost = () => {
+    setShowRejectModal(true);
+  };
+
+  // ✅ ข้อ 5.2: ลบรายการซ่อม
+  const handleDeleteRepairItem = (itemId) => {
+    const updatedItems = repairItems.filter(item => item.id !== itemId);
+    setRepairItems(updatedItems);
+  };
+
+  // ✅ ข้อ 5.2: คำนวณยอดรวมรายการซ่อม
+  const getTotalRepairCost = () => {
+    return repairItems.reduce((sum, item) => sum + item.cost, 0);
+  };
+
+  // ✅ ข้อ 5.2: คำนวณยอดที่เกินวงเงิน
+  const getExtraCost = () => {
+    const total = getTotalRepairCost();
+    const coverage = claim?.insuranceCoverage || 0;
+    return Math.max(0, total - coverage);
+  };
+
+  // ✅ ข้อ 5.2: ยืนยันการปฏิเสธรายการ
+  const handleConfirmReject = async () => {
+    console.log('บันทึกรายการที่ถูกลบ', repairItems);
+    // TODO: Backend - บันทึกรายการใหม่ที่ลดลง
+    // await axios.post(`/api/claims/${id}/update-repair-items`, { items: repairItems });
+    setShowRejectModal(false);
+    // loadClaimData(); // Reload
+  };
+
   if (loading) {
     return (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
           <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">
             refresh
           </span>
-            <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
-          </div>
+          <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
         </div>
+      </div>
     );
   }
 
   if (!claim) {
     return (
-        <div className="card-static text-center py-16">
+      <div className="card-static text-center py-16">
         <span className="material-icons-round text-6xl text-neutral-300 mb-4">
           error_outline
         </span>
-          <p className="text-neutral-500 text-lg mb-4">ไม่พบข้อมูลเคลม</p>
-          <Link to="/customer/claims" className="btn-primary">
-            กลับไปหน้ารายการเคลม
-          </Link>
-        </div>
+        <p className="text-neutral-500 text-lg mb-4">ไม่พบข้อมูลเคลม</p>
+        <Link to="/customer/claims" className="btn-primary">
+          กลับไปหน้ารายการเคลม
+        </Link>
+      </div>
     );
   }
 
+  const garageDisplay = getGarageDisplay();
+
   return (
-      <div className="space-y-6">
-        {/* ✅ Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <Link
-                to="/customer/claims"
-                className="inline-flex items-center gap-2 text-neutral-500 hover:text-primary-500 mb-3 transition-colors duration-300"
-            >
-              <span className="material-icons-round">arrow_back</span>
-              <span>กลับ</span>
-            </Link>
+    <div className="space-y-6">
+      {/* ✅ Header - ข้อ 1: แสดง claimNumber แทน title และแสดง priority badge */}
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            to="/customer/claims"
+            className="inline-flex items-center gap-2 text-neutral-500 hover:text-primary-500 mb-3 transition-colors duration-300"
+          >
+            <span className="material-icons-round">arrow_back</span>
+            <span>กลับ</span>
+          </Link>
 
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-neutral-dark">
-                {claim.title}
-              </h1>
-              <StatusBadge status={claim.status} />
-            </div>
-
-            <p className="text-neutral-500">
-              เลขที่เคลม:{" "}
-              <span className="font-medium text-neutral-dark">
+          <div className="flex items-center gap-3 mb-2">
+            {/* ✅ ข้อ 1: แสดง claimNumber แทน title */}
+            <h1 className="text-3xl font-bold text-neutral-dark">
               {claim.claimNumber}
-            </span>
-            </p>
+            </h1>
+            <StatusBadge status={claim.status} />
           </div>
 
-          <button
-              onClick={handleDownloadPDF}
-              className="btn-primary flex items-center gap-2"
-          >
-            <span className="material-icons-round">download</span>
-            <span>ดาวน์โหลด PDF</span>
-          </button>
+          {/* ✅ ข้อ 1: แสดง priority badge แทนเลขที่เคลม */}
+          <div className="flex items-center gap-2">
+            <p className="text-neutral-500">ระดับความด่วน:</p>
+            {getPriorityBadge(claim.priority)}
+          </div>
         </div>
 
-        {/* ✅ Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* ✅ Claim Info */}
-            <div className="card-static">
-              <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+        <button
+          onClick={handleDownloadPDF}
+          className="btn-primary flex items-center gap-2"
+        >
+          <span className="material-icons-round">download</span>
+          <span>ดาวน์โหลด PDF</span>
+        </button>
+      </div>
+
+      {/* ✅ ข้อ 5: Alert สำหรับกรณีอนุมัติไม่สำเร็จ */}
+      {claim.approvalFailed && claim.exceedsBudget && (
+        <div className="card bg-warning-50 border-2 border-warning">
+          <div className="flex items-start gap-4">
+            <span className="material-icons-round text-warning text-3xl">
+              warning
+            </span>
+            <div className="flex-1">
+              <h3 className="font-semibold text-warning-dark mb-2 text-lg">
+                อนุมัติเคลมไม่สำเร็จ
+              </h3>
+              <p className="text-neutral-700 mb-4">
+                กรุณายืนยันความยินยอมรับผิดชอบส่วนเกินวงเงิน
+              </p>
+
+              <div className="bg-white p-4 rounded-lg mb-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-neutral-500">ค่าซ่อมประเมิน</p>
+                    <p className="font-bold text-neutral-dark text-lg">
+                      ฿{claim.estimatedCost.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-neutral-500">วงเงินคุ้มครอง</p>
+                    <p className="font-bold text-primary-600 text-lg">
+                      ฿{claim.insuranceCoverage.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-neutral-500">ส่วนเกินที่ต้องจ่าย</p>
+                    <p className="font-bold text-error text-xl">
+                      ฿{(claim.estimatedCost - claim.insuranceCoverage).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleAcceptExtraCost}
+                  className="btn-primary flex-1"
+                >
+                  <span className="material-icons-round mr-2">check_circle</span>
+                  ยืนยัน
+                </button>
+                <button
+                  onClick={handleRejectExtraCost}
+                  className="btn-outline flex-1"
+                >
+                  <span className="material-icons-round mr-2">cancel</span>
+                  ปฏิเสธ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* ✅ Claim Info */}
+          <div className="card-static">
+            <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
               <span className="material-icons-round text-primary-500 leading-none">
                 info
               </span>
-                ข้อมูลการเคลม
-              </h2>
+              ข้อมูลการเคลม
+            </h2>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">วันเกิดเหตุ</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.incidentDate}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-neutral-500 mb-1">สถานที่เกิดเหตุ</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.location}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-neutral-500 mb-1">
-                    รายละเอียดเหตุการณ์
-                  </p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.detail || claim.description}
-                  </p>
-                </div>
+            {/* ✅ ข้อ 1: ลบ "เลขที่เคลม" ออกจาก grid */}
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">วันเกิดเหตุ</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.incidentDate}
+                </p>
               </div>
-            </div>
-
-            {/* ✅ Vehicle */}
-            <div className="card-static">
-              <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
-              <span className="material-icons-round text-primary-500 leading-none">
-                directions_car
-              </span>
-                ข้อมูลรถยนต์
-              </h2>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">ยี่ห้อ/รุ่น</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.vehicle.brand} {claim.vehicle.model} ({claim.vehicle.year})
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">ทะเบียนรถ</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.vehicle.licensePlate}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">สี</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.vehicle.color}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">เลขตัวถัง</p>
-                  <p className="font-medium text-neutral-dark">
-                    {claim.vehicle.chassisNumber}
-                  </p>
-                </div>
+              <div className="col-span-2">
+                <p className="text-sm text-neutral-500 mb-1">สถานที่เกิดเหตุ</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.location}
+                </p>
               </div>
-            </div>
-
-            {/* ✅ Timeline */}
-            <div className="card-static">
-              <h2 className="text-xl font-semibold text-neutral-dark mb-6 flex items-center gap-2">
-              <span className="material-icons-round text-primary-500 leading-none">
-                timeline
-              </span>
-                สถานะการดำเนินการ
-              </h2>
-
-              <ClaimTimeline
-                  currentStep={claim.currentStep}
-                  claimData={claim.timeline}
-              />
+              <div className="col-span-2">
+                <p className="text-sm text-neutral-500 mb-1">
+                  รายละเอียดเหตุการณ์
+                </p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.detail || claim.description}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* ✅ Sidebar */}
-          <div className="space-y-6">
-            {/* ✅ Cost Summary */}
-            <div className="card-static">
-              <h3 className="font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+          {/* ✅ Vehicle */}
+          <div className="card-static">
+            <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+              <span className="material-icons-round text-primary-500 leading-none">
+                directions_car
+              </span>
+              ข้อมูลรถยนต์
+            </h2>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">ยี่ห้อ/รุ่น</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.vehicle.brand} {claim.vehicle.model} ({claim.vehicle.year})
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">ทะเบียนรถ</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.vehicle.licensePlate}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">สี</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.vehicle.color}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-neutral-500 mb-1">เลขตัวถัง</p>
+                <p className="font-medium text-neutral-dark">
+                  {claim.vehicle.chassisNumber}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* ✅ ข้อ 4: รูปภาพความเสียหายและเอกสารประกอบ */}
+          <div className="card-static">
+            <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+              <span className="material-icons-round text-primary-500 leading-none">
+                photo_library
+              </span>
+              รูปภาพความเสียหายและเอกสารประกอบ
+            </h2>
+
+            {!claim.images || claim.images.length === 0 ? (
+              <div className="text-center py-12 bg-neutral-50 rounded-lg">
+                <span className="material-icons-round text-6xl text-neutral-300 mb-3">
+                  photo_library
+                </span>
+                <p className="text-neutral-500">ยังไม่มีรูปภาพ</p>
+                <p className="text-neutral-400 text-sm mt-1">
+                  รอบริษัทประกันภัยอัปโหลดรูปภาพจากการตรวจสอบพื้นที่
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {claim.images.map((image, index) => (
+                  <div
+                    key={index}
+                    className="relative group cursor-pointer"
+                    onClick={() => handleImageClick(image)}
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden bg-neutral-100">
+                      <img
+                        src={image.url}
+                        alt={image.caption}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                    </div>
+                    {/* ✅ ข้อ 4: แสดงชื่อรูปเมื่อ hover */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-300 rounded-lg flex items-end p-3">
+                      <p className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        {image.caption}
+                      </p>
+                    </div>
+                    {/* ✅ ข้อ 4: ไอคอนความเสียหาย (ไม่มีปุ่มลบ) */}
+                    <div className="absolute top-2 left-2 bg-error text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                      <span className="material-icons-round text-xs">priority_high</span>
+                      ความเสียหาย
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ✅ รายการซ่อม (Read-only สำหรับลูกค้า) */}
+          <div className="card-static">
+            <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+              <span className="material-icons-round text-primary-500 leading-none">
+                build
+              </span>
+              รายการซ่อม
+            </h2>
+
+            {!repairItems || repairItems.length === 0 ? (
+              <div className="text-center py-12 bg-neutral-50 rounded-lg">
+                <span className="material-icons-round text-5xl text-neutral-300 mb-3">
+                  construction
+                </span>
+                <p className="text-neutral-500">ยังไม่มีรายการซ่อม</p>
+                <p className="text-neutral-400 text-sm mt-1">
+                  รอบริษัทประกันภัยตรวจสอบและระบุรายการซ่อม
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 mb-4">
+                  {repairItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="p-4 bg-neutral-50 rounded-lg border border-neutral-200"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-neutral-500">
+                          รายการที่ {index + 1}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-neutral-500 mb-1">รายการ</p>
+                          <p className="font-medium text-neutral-dark">{item.name}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-neutral-500 mb-1">ค่าใช้จ่าย</p>
+                          <p className="font-semibold text-primary-600">
+                            ฿{item.cost.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ✅ สรุปยอดเงิน */}
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-neutral-600">วงเงินประกัน</span>
+                    <span className="font-semibold text-primary-600">
+                      ฿{(claim?.insuranceCoverage || 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg">
+                    <span className="text-primary-700 font-medium">ประเมินค่าใช้จ่ายโดยรวม</span>
+                    <span className="font-bold text-primary-700 text-xl">
+                      ฿{getTotalRepairCost().toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* ✅ ค่าใช้จ่ายเพิ่มเติม (ถ้าเกิน) */}
+                  {getExtraCost() > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-error">ค่าใช้จ่ายเพิ่มเติม (เกินวงเงิน)</span>
+                      <span className="font-bold text-error text-lg">
+                        ฿{getExtraCost().toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ✅ Timeline */}
+          <div className="card-static">
+            <h2 className="text-xl font-semibold text-neutral-dark mb-6 flex items-center gap-2">
+              <span className="material-icons-round text-primary-500 leading-none">
+                timeline
+              </span>
+              สถานะการดำเนินการ
+            </h2>
+
+            <ClaimTimeline
+              currentStep={claim.currentStep}
+              claimData={claim.timeline}
+            />
+          </div>
+        </div>
+
+        {/* ✅ Sidebar */}
+        <div className="space-y-6">
+          {/* ✅ Cost Summary */}
+          <div className="card-static">
+            <h3 className="font-semibold text-neutral-dark mb-4 flex items-center gap-2">
               <span className="material-icons-round text-primary-500 leading-none">
                 payments
               </span>
-                สรุปค่าใช้จ่าย
-              </h3>
+              สรุปค่าใช้จ่าย
+            </h3>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
-                  <span className="text-neutral-600">ค่าซ่อมประเมิน</span>
-                  <span className="font-semibold text-neutral-dark">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
+                <span className="text-neutral-600">ค่าซ่อมประเมิน</span>
+                <span className="font-semibold text-neutral-dark">
                   ฿{claim.estimatedCost.toLocaleString()}
                 </span>
-                </div>
+              </div>
 
-                <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg">
-                  <span className="text-primary-700">จำนวนเงินที่อนุมัติ</span>
-                  <span className="font-bold text-primary-700 text-lg">
+              <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg">
+                <span className="text-primary-700">จำนวนเงินที่อนุมัติ</span>
+                <span className="font-bold text-primary-700 text-lg">
                   ฿{claim.approvedAmount.toLocaleString()}
                 </span>
-                </div>
+              </div>
 
-                <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
-                  <span className="text-neutral-600">ต้องจ่ายเพิ่ม</span>
-                  <span className="font-semibold text-neutral-dark">
+              <div className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
+                <span className="text-neutral-600">ค่าใช้จ่ายเพิ่มเติม (เกินวงเงิน)</span>
+                <span className="font-semibold text-neutral-dark">
                   ฿{claim.deductible.toLocaleString()}
                 </span>
+              </div>
+            </div>
+          </div>
+          {/* ✅ ปุ่มดำเนินการเมื่อเกินวงเงิน */}
+          {repairItems.length > 0 && getExtraCost() > 0 && (
+            <div className="card bg-warning-50 border-2 border-warning">
+              <div className="flex items-start gap-3">
+                <span className="material-icons-round text-warning text-2xl">
+                  warning
+                </span>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-warning-dark mb-2">
+                    เกินวงเงินประกัน
+                  </h3>
+                  <p className="text-neutral-700 text-sm mb-3">
+                    ค่าซ่อมเกินวงเงินคุ้มครอง ฿{getExtraCost().toLocaleString()}
+                  </p>
+
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleAcceptExtraCost}
+                      className="btn-primary w-full text-sm"
+                    >
+                      <span className="material-icons-round mr-1 text-sm">check_circle</span>
+                      ยืนยันรับผิดชอบส่วนเกิน
+                    </button>
+
+                    <button
+                      onClick={handleRejectExtraCost}
+                      className="btn-outline w-full text-sm"
+                    >
+                      <span className="material-icons-round mr-1 text-sm">cancel</span>
+                      ปฏิเสธรายการ
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* ✅ Garage Info */}
-            {claim.garage && (
-                <div className="card-static">
-                  <h3 className="font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+          {/* ✅ ข้อ 2: Garage Info - แสดงตาม logic ที่กำหนด */}
+          {garageDisplay.show && (
+            <div className="card-static">
+              <h3 className="font-semibold text-neutral-dark mb-4 flex items-center gap-2">
                 <span className="material-icons-round text-primary-500 leading-none">
                   build_circle
                 </span>
-                    อู่ซ่อม
-                  </h3>
+                อู่ซ่อม
+              </h3>
 
+              {garageDisplay.type === 'placeholder' && (
+                <div className="text-center py-4">
+                  <p className="text-neutral-400 text-lg">{garageDisplay.message}</p>
+                </div>
+              )}
+
+              {garageDisplay.type === 'action' && (
+                <div className="text-center py-4">
+                  <p className="text-warning font-medium mb-3">{garageDisplay.message}</p>
+                  <Link
+                    to={`/customer/claims/${claim.id}/select-garage`}
+                    className="btn-primary inline-flex items-center gap-2"
+                  >
+                    <span className="material-icons-round">build_circle</span>
+                    เลือกอู่ซ่อม
+                  </Link>
+                </div>
+              )}
+
+              {garageDisplay.type === 'info' && (
+                <>
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm text-neutral-500 mb-1">ชื่ออู่</p>
                       <p className="font-medium text-neutral-dark">
-                        {claim.garage.name}
+                        {garageDisplay.garage.name}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-neutral-500 mb-1">เบอร์โทร</p>
                       <a
-                          href={`tel:${claim.garage.phone}`}
-                          className="text-primary-600 hover:text-primary-700 font-medium"
+                        href={`tel:${garageDisplay.garage.phone}`}
+                        className="text-primary-600 hover:text-primary-700 font-medium"
                       >
-                        {claim.garage.phone}
+                        {garageDisplay.garage.phone}
                       </a>
                     </div>
                   </div>
@@ -327,104 +696,234 @@ const ClaimDetail = () => {
                     <span className="material-icons-round mr-2">map</span>
                     ดูแผนที่
                   </button>
-                </div>
-            )}
+                </>
+              )}
+            </div>
+          )}
 
-            {/* ✅ Assigned Officer */}
-            <div className="card bg-gradient-secondary text-white">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
+          {/* ✅ Assigned Officer */}
+          <div className="card bg-gradient-secondary text-white">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
               <span className="material-icons-round leading-none">
                 support_agent
               </span>
-                เจ้าหน้าที่ผู้ดูแล
-              </h3>
+              เจ้าหน้าที่ผู้ดูแล
+            </h3>
 
-              <div className="space-y-2 text-sm mb-4">
-                <p>
-                  <span className="opacity-80">ชื่อ:</span>{" "}
-                  <span className="font-medium">{claim.assignedOfficer.name}</span>
-                </p>
+            <div className="space-y-2 text-sm mb-4">
+              <p>
+                <span className="opacity-80">ชื่อ:</span>{" "}
+                <span className="font-medium">{claim.assignedOfficer.name}</span>
+              </p>
 
-                <p>
-                  <span className="opacity-80">โทร:</span>{" "}
-                  <a
-                      href={`tel:${claim.assignedOfficer.phone}`}
-                      className="font-medium hover:underline"
-                  >
-                    {claim.assignedOfficer.phone}
-                  </a>
-                </p>
+              <p>
+                <span className="opacity-80">โทร:</span>{" "}
+                <a
+                  href={`tel:${claim.assignedOfficer.phone}`}
+                  className="font-medium hover:underline"
+                >
+                  {claim.assignedOfficer.phone}
+                </a>
+              </p>
 
-                <p>
-                  <span className="opacity-80">อีเมล:</span>{" "}
-                  <a
-                      href={`mailto:${claim.assignedOfficer.email}`}
-                      className="font-medium hover:underline"
-                  >
-                    {claim.assignedOfficer.email}
-                  </a>
-                </p>
-              </div>
-
-              <button className="btn-outline !border-white !text-white hover:!bg-white hover:!text-secondary-600 w-full">
-                <span className="material-icons-round mr-2">phone</span>
-                ติดต่อเจ้าหน้าที่
-              </button>
+              <p>
+                <span className="opacity-80">อีเมล:</span>{" "}
+                <a
+                  href={`mailto:${claim.assignedOfficer.email}`}
+                  className="font-medium hover:underline"
+                >
+                  {claim.assignedOfficer.email}
+                </a>
+              </p>
             </div>
 
-            {/* ✅ Quick Actions */}
-            <div className="card">
-              <h3 className="font-semibold text-neutral-dark mb-4">
-                การดำเนินการด่วน
-              </h3>
+            <button className="btn-outline !border-white !text-white hover:!bg-white hover:!text-secondary-600 w-full">
+              <span className="material-icons-round mr-2">phone</span>
+              ติดต่อเจ้าหน้าที่
+            </button>
+          </div>
 
-              <div className="space-y-2">
-                {claim.status === "approved" && !claim.garage && (
-                    <Link
-                        to={`/customer/claims/${claim.id}/select-garage`}
-                        className="btn-primary w-full flex items-center justify-center gap-2"
-                    >
-                      <span className="material-icons-round">build_circle</span>
-                      เลือกอู่ซ่อม
-                    </Link>
-                )}
+          {/* ✅ ข้อ 3: Quick Actions - ปุ่มเลือกอู่ซ่อมมีอยู่แล้ว */}
+          <div className="card">
+            <h3 className="font-semibold text-neutral-dark mb-4">
+              การดำเนินการด่วน
+            </h3>
 
+            <div className="space-y-2">
+              {/* ✅ ข้อ 3: ปุ่มเลือกอู่ซ่อม (แสดงเมื่อ approved และยังไม่มีอู่) */}
+              {claim.status === "approved" && !claim.garage && (
                 <Link
-                    to="/customer/urgent-request"
-                    className="btn-outline w-full flex items-center justify-center gap-2"
+                  to={`/customer/claims/${claim.id}/select-garage`}
+                  className="btn-primary w-full flex items-center justify-center gap-2"
                 >
-                  <span className="material-icons-round">priority_high</span>
-                  ขออนุมัติซ่อมด่วน
+                  <span className="material-icons-round">build_circle</span>
+                  เลือกอู่ซ่อม
                 </Link>
+              )}
 
-                <Link
-                    to="/customer/complaint"
-                    className="btn-ghost w-full flex items-center justify-center gap-2"
-                >
-                  <span className="material-icons-round">report_problem</span>
-                  แจ้งร้องเรียน
-                </Link>
-              </div>
+              <Link
+                to="/customer/urgent-request"
+                className="btn-outline w-full flex items-center justify-center gap-2"
+              >
+                <span className="material-icons-round">priority_high</span>
+                ขออนุมัติซ่อมด่วน
+              </Link>
+
+              <Link
+                to="/customer/complaint"
+                className="btn-ghost w-full flex items-center justify-center gap-2"
+              >
+                <span className="material-icons-round">report_problem</span>
+                แจ้งร้องเรียน
+              </Link>
             </div>
           </div>
         </div>
-
-        {/* ✅ Image Modal */}
-        {showImageModal && selectedImage && (
-            <Modal
-                isOpen={showImageModal}
-                onClose={() => setShowImageModal(false)}
-                title={selectedImage.caption}
-                size="lg"
-            >
-              <img
-                  src={selectedImage.url}
-                  alt={selectedImage.caption}
-                  className="w-full rounded-lg"
-              />
-            </Modal>
-        )}
       </div>
+
+      {/* ✅ ข้อ 4: Image Modal - ลูกค้าดูได้อย่างเดียว (ไม่มีปุ่มลบ) */}
+      {showImageModal && selectedImage && (
+        <Modal
+          isOpen={showImageModal}
+          onClose={() => setShowImageModal(false)}
+          title={selectedImage.caption}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.caption}
+              className="w-full rounded-lg"
+            />
+
+            {/* แสดงรายละเอียดเพิ่มเติม */}
+            <div className="bg-neutral-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-neutral-500 mb-1">ประเภทรูปภาพ</p>
+                  <p className="font-medium text-neutral-dark">
+                    {selectedImage.type || 'ความเสียหาย'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-neutral-500 mb-1">ชื่อไฟล์/คำบรรยาย</p>
+                  <p className="font-medium text-neutral-dark">
+                    {selectedImage.caption}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ✅ ข้อ 5.2: Modal สำหรับปฏิเสธและลบรายการซ่อม */}
+      {showRejectModal && (
+        <Modal
+          isOpen={showRejectModal}
+          onClose={() => setShowRejectModal(false)}
+          title="ปฏิเสธรายการซ่อม"
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="bg-warning-50 border border-warning p-4 rounded-lg">
+              <p className="text-neutral-700 text-sm">
+                กรุณาเลือกปฏิเสธบางรายการซ่อมให้อยู่ในวงเงินเพื่อดำเนินการต่อ
+              </p>
+            </div>
+
+            {/* ✅ รายการซ่อม */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-neutral-dark flex items-center gap-2">
+                <span className="material-icons-round text-primary-500">build</span>
+                รายการซ่อม
+              </h3>
+
+              {repairItems.length === 0 ? (
+                <p className="text-neutral-500 text-center py-8">ไม่มีรายการซ่อม</p>
+              ) : (
+                repairItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg border border-neutral-200 hover:border-primary-300 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm text-neutral-500 mb-1">รายการที่ {index + 1}</p>
+                      <p className="font-medium text-neutral-dark">{item.name}</p>
+                      <p className="text-sm text-neutral-600 mt-1">
+                        ฿{item.cost.toLocaleString()}
+                      </p>
+                    </div>
+
+                    {/* ✅ ข้อ 5.2: ปุ่มลบรายการ */}
+                    <button
+                      onClick={() => handleDeleteRepairItem(item.id)}
+                      className="p-2 text-error hover:bg-error-50 rounded-lg transition-colors"
+                      title="ลบรายการ"
+                    >
+                      <span className="material-icons-round">delete</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ✅ สรุปยอดเงิน */}
+            <div className="space-y-2 pt-4 border-t">
+              {/* ✅ ข้อ 5.2 (เพิ่มเติม): วงเงินประกัน */}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-neutral-600">วงเงินประกัน</span>
+                <span className="font-semibold text-primary-600">
+                  ฿{claim.insuranceCoverage.toLocaleString()}
+                </span>
+              </div>
+
+              {/* ✅ ประเมินค่าใช้จ่ายโดยรวม */}
+              <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg">
+                <span className="text-primary-700 font-medium">ประเมินค่าใช้จ่ายโดยรวม</span>
+                <span className="font-bold text-primary-700 text-xl">
+                  ฿{getTotalRepairCost().toLocaleString()}
+                </span>
+              </div>
+
+              {/* ✅ ข้อ 5.2: ค่าใช้จ่ายเพิ่มเติม */}
+              {getExtraCost() > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-error">ค่าใช้จ่ายเพิ่มเติม (เกินวงเงิน)</span>
+                  <span className="font-bold text-error text-lg">
+                    ฿{getExtraCost().toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ✅ ปุ่มยืนยัน */}
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="btn-ghost flex-1"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                className="btn-primary flex-1"
+                disabled={getExtraCost() > 0}
+              >
+                <span className="material-icons-round mr-2">check</span>
+                ยืนยัน
+              </button>
+            </div>
+
+            {getExtraCost() > 0 && (
+              <p className="text-error text-sm text-center">
+                * ยังคงเกินวงเงิน กรุณาลบรายการเพิ่มเติม
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
+    </div>
   );
 };
 

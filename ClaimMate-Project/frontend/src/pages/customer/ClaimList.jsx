@@ -116,7 +116,6 @@ const ClaimList = () => {
     if (searchTerm) {
       result = result.filter(claim =>
         claim.claimNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        claim.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         claim.carModel.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -178,7 +177,7 @@ const ClaimList = () => {
               </span>
               <input
                 type="text"
-                placeholder="ค้นหาด้วยเลขเคลม, รายละเอียด, รุ่นรถ..."
+                placeholder="ค้นหาด้วยเลขเคลม, รุ่นรถ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="input-field pl-12"
@@ -230,20 +229,18 @@ const ClaimList = () => {
               <div className="flex items-start justify-between gap-4">
                 {/* Left - Claim Info */}
                 <div className="flex-1 min-w-0">
+                  {/* ✅ ข้อ 1: แสดง claimNumber แทน title */}
                   <div className="flex items-center gap-3 mb-3">
                     <h3 className="text-lg font-semibold text-neutral-dark">
-                      {claim.title}
+                      {claim.claimNumber}
                     </h3>
                     <StatusBadge status={claim.status} size="sm" />
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  {/* ✅ ข้อ 1: ลบคอลัมน์ "เลขที่เคลม" - เหลือแค่ 3 คอลัมน์ */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <p className="text-xs text-neutral-500 mb-1">เลขที่เคลม</p>
-                      <p className="font-medium text-neutral-dark">{claim.claimNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p> {/* แก้ไข: เปลี่ยน 'วันที่แจ้ง' เป็น 'วันเกิดเหตุ' */}
+                      <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p>
                       <p className="font-medium text-neutral-dark">{claim.date}</p>
                     </div>
                     <div>

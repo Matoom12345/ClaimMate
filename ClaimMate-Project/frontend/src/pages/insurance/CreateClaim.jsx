@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Input, TextArea } from "../../components";
+import PolicyReviewStep from "./PolicyReviewStep"; // ✅ เพิ่ม
+
 
 const CreateClaim = () => {
   const navigate = useNavigate();
@@ -29,6 +31,8 @@ const CreateClaim = () => {
   const [errors, setErrors] = useState({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newClaimId, setNewClaimId] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1); // ✅ 1: search, 2: review, 3: form
+
 
   const priorityOptions = [
     { value: "urgent", label: "ด่วนมาก", icon: "priority_high" },
@@ -72,19 +76,20 @@ const CreateClaim = () => {
 
     try {
       const userRes = await axios.get(
-          `http://localhost:3000/api/users/by-idcard/${cleanIdCard}`
+        `http://localhost:3000/api/users/by-idcard/${cleanIdCard}`
       );
 
       const user = userRes.data.user;
 
       const carRes = await axios.get(
-          `http://localhost:3000/api/cars/by-customer/${user.customerID}`
+        `http://localhost:3000/api/cars/by-customer/${user.customerID}`
       );
 
       setCustomerFound({
         ...user,
         vehicles: carRes.data.cars || [],
       });
+      setCurrentStep(2);
     } catch {
       setCustomerFound(null);
       setErrors({ idCard: "ไม่พบข้อมูลลูกค้า" });
@@ -119,6 +124,28 @@ const CreateClaim = () => {
   };
 
   /* ────────────────────────────────────────────────
+   ✅ POLICY REVIEW HANDLERS
+─────────────────────────────────────────────────*/
+  const handleProceedFromReview = () => {
+    setCurrentStep(3); // ไปหน้ากรอกข้อมูลเหตุการณ์
+  };
+
+  const handleCancelFromReview = () => {
+    // ยกเลิกการเปิดเคส - กลับไปหน้าค้นหาใหม่
+    setCurrentStep(1);
+    setCustomerFound(null);
+    setSelectedVehicleId(null);
+    setFormData({
+      idCard: "",
+      incidentDate: "",
+      incidentTime: "",
+      location: "",
+      description: "",
+      priority: "normal",
+    });
+  };
+
+  /* ────────────────────────────────────────────────
      ✅ VALIDATION
   ─────────────────────────────────────────────────*/
   const validate = () => {
@@ -133,7 +160,7 @@ const CreateClaim = () => {
       newErrors.location = "กรุณากรอกสถานที่เกิดเหตุ (อย่างน้อย 10 ตัวอักษร)";
     if (!formData.description || formData.description.trim().length < 20)
       newErrors.description =
-          "กรุณาอธิบายเหตุการณ์ (อย่างน้อย 20 ตัวอักษร)";
+        "กรุณาอธิบายเหตุการณ์ (อย่างน้อย 20 ตัวอักษร)";
 
     return newErrors;
   };
@@ -161,7 +188,6 @@ const CreateClaim = () => {
         customerID: customerFound.customerID,
         insuranceID: currentUser.insuranceID, // ✅ FIX: insuranceID ALWAYS AVAILABLE NOW
         carID: selectedVehicleId,
-        title: "อุบัติเหตุจากลูกค้า",
         location: formData.location,
         detail: formData.description,
         priorityLevel: formData.priority,
@@ -192,82 +218,94 @@ const CreateClaim = () => {
      ✅ RENDER
   ─────────────────────────────────────────────────*/
   return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <button
+    <>
+      {/* ✅ STEP 2: Policy Review */}
+      {currentStep === 2 && (
+        <PolicyReviewStep
+          customer={customerFound}
+          onContinue={handleProceedFromReview}
+          onCancel={handleCancelFromReview}
+        />
+      )}
+
+      {/* ✅ STEP 1 & 3: Search + Form */}
+      {currentStep !== 2 && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <button
               onClick={() => navigate(-1)}
               className="inline-flex items-center gap-2 text-neutral-500 hover:text-primary-500 mb-3"
-          >
-            <span className="material-icons-round">arrow_back</span>
-            <span>กลับ</span>
-          </button>
+            >
+              <span className="material-icons-round">arrow_back</span>
+              <span>กลับ</span>
+            </button>
 
-          <h1 className="text-3xl font-bold text-neutral-dark mb-2">
-            เปิดเคสเคลมใหม่
-          </h1>
-          <p className="text-neutral-500">
-            ค้นหาลูกค้าจากเลขบัตรประชาชน และกรอกข้อมูลเหตุการณ์
-          </p>
-        </div>
+            <h1 className="text-3xl font-bold text-neutral-dark mb-2">
+              เปิดเคสเคลมใหม่
+            </h1>
+            <p className="text-neutral-500">
+              ค้นหาลูกค้าจากเลขบัตรประชาชน และกรอกข้อมูลเหตุการณ์
+            </p>
+          </div>
 
-        {/* FORM */}
-        <form
+          {/* FORM */}
+          <form
             onSubmit={handleSubmit}
             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-        >
-          {/* LEFT */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* ✅ Customer Search */}
-            <div className="card-static">
-              <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
-                <span className="material-icons-round text-primary-500">search</span>
-                <span>ค้นหาข้อมูลลูกค้า</span>
-              </h2>
+          >
+            {/* LEFT */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* ✅ Customer Search */}
+              <div className="card-static">
+                <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
+                  <span className="material-icons-round text-primary-500">search</span>
+                  <span>ค้นหาข้อมูลลูกค้า</span>
+                </h2>
 
-              {/* ✅ BEFORE SEARCH */}
-              {!customerFound ? (
+                {/* ✅ BEFORE SEARCH */}
+                {!customerFound ? (
                   <div className="flex gap-3">
                     <Input
-                        label="เลขบัตรประชาชน"
-                        name="idCard"
-                        value={formData.idCard}
-                        onChange={handleChange}
-                        icon="badge"
-                        error={errors.idCard}
-                        maxLength="13"
+                      label="เลขบัตรประชาชน"
+                      name="idCard"
+                      value={formData.idCard}
+                      onChange={handleChange}
+                      icon="badge"
+                      error={errors.idCard}
+                      maxLength="13"
                     />
 
                     <button
-                        type="button"
-                        onClick={handleSearchCustomer}
-                        className="btn-primary mt-7 flex items-center gap-2"
-                        disabled={searchingCustomer}
+                      type="button"
+                      onClick={handleSearchCustomer}
+                      className="btn-primary mt-7 flex items-center gap-2"
+                      disabled={searchingCustomer}
                     >
                       {searchingCustomer ? (
-                          <>
-                      <span className="material-icons-round animate-spin">
-                        refresh
-                      </span>
-                            <span>กำลังค้นหา...</span>
-                          </>
+                        <>
+                          <span className="material-icons-round animate-spin">
+                            refresh
+                          </span>
+                          <span>กำลังค้นหา...</span>
+                        </>
                       ) : (
-                          <>
-                            <span className="material-icons-round">search</span>
-                            <span>ค้นหา</span>
-                          </>
+                        <>
+                          <span className="material-icons-round">search</span>
+                          <span>ค้นหา</span>
+                        </>
                       )}
                     </button>
                   </div>
-              ) : (
+                ) : (
                   <>
                     {/* ✅ CUSTOMER FOUND */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center">
-                      <span className="material-icons-round text-2xl text-success">
-                        check_circle
-                      </span>
+                          <span className="material-icons-round text-2xl text-success">
+                            check_circle
+                          </span>
                         </div>
 
                         <div>
@@ -281,9 +319,9 @@ const CreateClaim = () => {
                       </div>
 
                       <button
-                          type="button"
-                          onClick={handleClearCustomer}
-                          className="btn-ghost btn-sm"
+                        type="button"
+                        onClick={handleClearCustomer}
+                        className="btn-ghost btn-sm"
                       >
                         <span className="material-icons-round text-sm">close</span>
                         <span>ค้นหาใหม่</span>
@@ -323,20 +361,20 @@ const CreateClaim = () => {
                         </p>
 
                         {selectedVehicleId && (
-                            <span className="text-xs text-secondary-600 flex items-center gap-1">
-                        <span className="material-icons-round text-sm">
-                          check_circle
-                        </span>
-                        เลือกแล้ว
-                      </span>
+                          <span className="text-xs text-secondary-600 flex items-center gap-1">
+                            <span className="material-icons-round text-sm">
+                              check_circle
+                            </span>
+                            เลือกแล้ว
+                          </span>
                         )}
                       </div>
 
                       {errors.vehicle && (
-                          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-error">
-                            <span className="material-icons-round text-lg">error</span>
-                            {errors.vehicle}
-                          </div>
+                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-error">
+                          <span className="material-icons-round text-lg">error</span>
+                          {errors.vehicle}
+                        </div>
                       )}
 
                       <div className="space-y-2">
@@ -344,74 +382,70 @@ const CreateClaim = () => {
                           const isSelected = selectedVehicleId === vehicle.carID;
 
                           return (
-                              <button
-                                  type="button"
-                                  key={vehicle.carID}
-                                  onClick={() => handleSelectVehicle(vehicle.carID)}
-                                  className={`
+                            <button
+                              type="button"
+                              key={vehicle.carID}
+                              onClick={() => handleSelectVehicle(vehicle.carID)}
+                              className={`
                             w-full p-4 border-2 rounded-lg transition-all
-                            ${
-                                      isSelected
-                                          ? "border-primary-500 bg-primary-50 shadow-md"
-                                          : "border-neutral-200 hover:border-primary-300"
-                                  }
+                            ${isSelected
+                                  ? "border-primary-500 bg-primary-50 shadow-md"
+                                  : "border-neutral-200 hover:border-primary-300"
+                                }
                           `}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div
-                                      className={`
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`
                               w-10 h-10 rounded-lg flex items-center justify-center
-                              ${
-                                          isSelected
-                                              ? "bg-primary-100 text-primary-600"
-                                              : "bg-neutral-100 text-neutral-400"
-                                      }
+                              ${isSelected
+                                      ? "bg-primary-100 text-primary-600"
+                                      : "bg-neutral-100 text-neutral-400"
+                                    }
                             `}
-                                  >
-                                    <span className="material-icons-round">directions_car</span>
-                                  </div>
-
-                                  <div className="flex-1 text-left">
-                                    <p
-                                        className={`font-medium ${
-                                            isSelected ? "text-primary-700" : "text-neutral-dark"
-                                        }`}
-                                    >
-                                      {vehicle.brand} {vehicle.model} ({vehicle.year})
-                                    </p>
-                                    <p
-                                        className={`text-sm ${
-                                            isSelected ? "text-primary-600" : "text-neutral-500"
-                                        }`}
-                                    >
-                                      ทะเบียน: {vehicle.licensePlate} • สี:{" "}
-                                      {vehicle.color}
-                                    </p>
-                                  </div>
-
-                                  {vehicle.isPrimary && (
-                                      <span className="badge badge-secondary text-xs">
-                                หลัก
-                              </span>
-                                  )}
-
-                                  {isSelected && (
-                                      <span className="material-icons-round text-primary-500 text-2xl">
-                                check_circle
-                              </span>
-                                  )}
+                                >
+                                  <span className="material-icons-round">directions_car</span>
                                 </div>
-                              </button>
+
+                                <div className="flex-1 text-left">
+                                  <p
+                                    className={`font-medium ${isSelected ? "text-primary-700" : "text-neutral-dark"
+                                      }`}
+                                  >
+                                    {vehicle.brand} {vehicle.model} ({vehicle.year})
+                                  </p>
+                                  <p
+                                    className={`text-sm ${isSelected ? "text-primary-600" : "text-neutral-500"
+                                      }`}
+                                  >
+                                    ทะเบียน: {vehicle.licensePlate} • สี:{" "}
+                                    {vehicle.color}
+                                  </p>
+                                </div>
+
+                                {vehicle.isPrimary && (
+                                  <span className="badge badge-secondary text-xs">
+                                    หลัก
+                                  </span>
+                                )}
+
+                                {isSelected && (
+                                  <span className="material-icons-round text-primary-500 text-2xl">
+                                    check_circle
+                                  </span>
+                                )}
+                              </div>
+                            </button>
                           );
                         })}
                       </div>
                     </div>
                   </>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* ✅ INCIDENT INFO */}
-            {customerFound && (
+              {/* ✅ INCIDENT INFO */}
+              {customerFound && currentStep === 3 &&(
                 <div className="card-static">
                   <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
                     <span className="material-icons-round text-primary-500">event_note</span>
@@ -421,52 +455,52 @@ const CreateClaim = () => {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
-                          label="วันที่เกิดเหตุ"
-                          name="incidentDate"
-                          type="date"
-                          value={formData.incidentDate}
-                          onChange={handleChange}
-                          error={errors.incidentDate}
-                          icon="calendar_today"
+                        label="วันที่เกิดเหตุ"
+                        name="incidentDate"
+                        type="date"
+                        value={formData.incidentDate}
+                        onChange={handleChange}
+                        error={errors.incidentDate}
+                        icon="calendar_today"
                       />
 
                       <Input
-                          label="เวลาที่เกิดเหตุ (ประมาณ)"
-                          name="incidentTime"
-                          type="time"
-                          value={formData.incidentTime}
-                          onChange={handleChange}
-                          icon="schedule"
+                        label="เวลาที่เกิดเหตุ (ประมาณ)"
+                        name="incidentTime"
+                        type="time"
+                        value={formData.incidentTime}
+                        onChange={handleChange}
+                        icon="schedule"
                       />
                     </div>
 
                     <Input
-                        label="สถานที่เกิดเหตุ"
-                        name="location"
-                        value={formData.location}
-                        onChange={handleChange}
-                        placeholder="เช่น ถนนรัชดาภิเษก ซอย 7 ..."
-                        error={errors.location}
-                        icon="location_on"
+                      label="สถานที่เกิดเหตุ"
+                      name="location"
+                      value={formData.location}
+                      onChange={handleChange}
+                      placeholder="เช่น ถนนรัชดาภิเษก ซอย 7 ..."
+                      error={errors.location}
+                      icon="location_on"
                     />
 
                     <TextArea
-                        label="รายละเอียดเหตุการณ์"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleChange}
-                        placeholder="อธิบายเหตุการณ์อย่างละเอียด..."
-                        rows={6}
-                        error={errors.description}
+                      label="รายละเอียดเหตุการณ์"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      placeholder="อธิบายเหตุการณ์อย่างละเอียด..."
+                      rows={6}
+                      error={errors.description}
                     />
                   </div>
                 </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* RIGHT SIDEBAR */}
-          <div className="space-y-6">
-            {customerFound && (
+            {/* RIGHT SIDEBAR */}
+            <div className="space-y-6">
+              {customerFound && currentStep === 3 && (
                 <div className="card-static">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <span className="material-icons-round text-primary-500">flag</span>
@@ -475,103 +509,100 @@ const CreateClaim = () => {
 
                   <div className="space-y-2">
                     {priorityOptions.map((option) => (
-                        <label
-                            key={option.value}
-                            className={`
+                      <label
+                        key={option.value}
+                        className={`
                       flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all
-                      ${
-                                formData.priority === option.value
-                                    ? "border-primary-500 bg-primary-50"
-                                    : "border-neutral-200 hover:border-primary-300"
-                            }
+                      ${formData.priority === option.value
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-neutral-200 hover:border-primary-300"
+                          }
                     `}
+                      >
+                        <input
+                          type="radio"
+                          name="priority"
+                          value={option.value}
+                          checked={formData.priority === option.value}
+                          onChange={handleChange}
+                          className="sr-only"
+                        />
+
+                        <span
+                          className={`material-icons-round ${formData.priority === option.value
+                            ? "text-primary-600"
+                            : "text-neutral-400"
+                            }`}
                         >
-                          <input
-                              type="radio"
-                              name="priority"
-                              value={option.value}
-                              checked={formData.priority === option.value}
-                              onChange={handleChange}
-                              className="sr-only"
-                          />
+                          {option.icon}
+                        </span>
 
-                          <span
-                              className={`material-icons-round ${
-                                  formData.priority === option.value
-                                      ? "text-primary-600"
-                                      : "text-neutral-400"
-                              }`}
-                          >
-                      {option.icon}
-                    </span>
-
-                          <span
-                              className={`flex-1 font-medium text-sm ${
-                                  formData.priority === option.value
-                                      ? "text-primary-700"
-                                      : "text-neutral-700"
-                              }`}
-                          >
-                      {option.label}
-                    </span>
-                        </label>
+                        <span
+                          className={`flex-1 font-medium text-sm ${formData.priority === option.value
+                            ? "text-primary-700"
+                            : "text-neutral-700"
+                            }`}
+                        >
+                          {option.label}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </div>
-            )}
+              )}
 
-            {/* INFO BOX */}
-            <div className="card bg-gradient-primary text-white">
-              <span className="material-icons-round text-4xl mb-3">info</span>
-              <h3 className="font-semibold mb-2">ขั้นตอนการเคลม</h3>
-              <ol className="text-sm text-white/80 space-y-2 list-decimal list-inside">
-                <li>ค้นหาข้อมูลลูกค้า</li>
-                <li>กรอกข้อมูลเหตุการณ์</li>
-                <li>เปิดเคส</li>
-                <li>พนักงานลงพื้นที่ตรวจสอบ</li>
-                <li>อัปโหลดรายงาน</li>
-              </ol>
-            </div>
+              {/* INFO BOX */}
+              <div className="card bg-gradient-primary text-white">
+                <span className="material-icons-round text-4xl mb-3">info</span>
+                <h3 className="font-semibold mb-2">ขั้นตอนการเคลม</h3>
+                <ol className="text-sm text-white/80 space-y-2 list-decimal list-inside">
+                  <li>ค้นหาข้อมูลลูกค้า</li>
+                  <li>กรอกข้อมูลเหตุการณ์</li>
+                  <li>เปิดเคส</li>
+                  <li>พนักงานลงพื้นที่ตรวจสอบ</li>
+                  <li>อัปโหลดรายงาน</li>
+                </ol>
+              </div>
 
-            {/* ✅ SUBMIT BUTTON */}
-            {customerFound && (
+              {/* ✅ SUBMIT BUTTON */}
+              {customerFound && (
                 <div className="space-y-3">
                   <button type="submit" className="btn-primary w-full" disabled={submitting}>
                     {submitting ? (
-                        <>
-                          <span className="material-icons-round animate-spin mr-2">refresh</span>
-                          กำลังสร้างเคส...
-                        </>
+                      <>
+                        <span className="material-icons-round animate-spin mr-2">refresh</span>
+                        กำลังสร้างเคส...
+                      </>
                     ) : (
-                        <>
-                          <span className="material-icons-round mr-2">check_circle</span>
-                          เปิดเคส
-                        </>
+                      <>
+                        <span className="material-icons-round mr-2">check_circle</span>
+                        เปิดเคส
+                      </>
                     )}
                   </button>
 
                   <button
-                      type="button"
-                      onClick={() => navigate(-1)}
-                      className="btn-outline w-full"
-                      disabled={submitting}
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    className="btn-outline w-full"
+                    disabled={submitting}
                   >
                     ยกเลิก
                   </button>
                 </div>
-            )}
-          </div>
-        </form>
+              )}
+            </div>
+          </form>
 
-        {/* ✅ SUCCESS MODAL */}
-        {showSuccessModal && (
+          {/* ✅ SUCCESS MODAL */}
+          {showSuccessModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-white rounded-2xl p-8 max-w-md w-full">
                 <div className="text-center">
                   <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-icons-round text-5xl text-success">
-                  check_circle
-                </span>
+                    <span className="material-icons-round text-5xl text-success">
+                      check_circle
+                    </span>
                   </div>
 
                   <h2 className="text-2xl font-bold mb-2">เปิดเคสสำเร็จ!</h2>
@@ -585,8 +616,10 @@ const CreateClaim = () => {
                 </div>
               </div>
             </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+    </>
   );
 };
 
