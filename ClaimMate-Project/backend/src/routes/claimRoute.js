@@ -14,6 +14,16 @@ const upload = require("../middlewares/upload"); // ✅ (ตัวนี้ใ�
 const cloudinary = require("../config/cloudinary");
 const uploadImage = require("../utils/uploadToCloudinary"); // ⭐️ (เพิ่ม import นี้)
 
+async function calculateTotalCost(claimNumber) {
+    const items = await RepairItem.find({ claimNumber });
+
+    const total = items.reduce((sum, item) => {
+        return sum + (Number(item.cost) || 0);
+    }, 0);
+
+    return total;
+}
+
 
 
 /* =====================================================
@@ -388,45 +398,55 @@ router.get("/detail/:claimNumber", async (req, res) => {
             // (ใน $project อาจจะต้องเพิ่มการ check null เช่น $ifNull)
             {
                 $project: {
-                    id: "$customer.customerID", // อาจเป็น null
+                    id: "$customer.customerID",
+
+                    // claim info
                     claimNumber: 1,
                     title: 1,
-                    // ... (rest of your fields) ...
+                    detail: 1,
+                    location: 1,
+                    state: 1,
+                    currentStep: 1,
 
-                    // ถ้า $unwind แล้วเป็น null, $car.model จะเป็น null
-                    // ใช้ $ifNull เพื่อป้องกัน error
-                    carModel: { $ifNull: ["$car.model", "N/A"] },
-                    carBrand: { $ifNull: ["$car.brand", "N/A"] },
-                    carYear: { $ifNull: ["$car.year", "N/A"] },
-                    licensePlate: { $ifNull: ["$car.licensePlate", "N/A"] },
-                    // ... (rest of car fields) ...
+                    incidentDate: 1,
+                    estimatedCost: 1,
+                    approvedCost: 1,
+                    additionalCost: 1,
 
-                    garageName: { $ifNull: ["$garage.garageName", "N/A"] },
-                    // ... (rest of garage fields) ...
+                    // ✅ timeline dates
+                    reportedDate: 1,
+                    inspectionDate: 1,
+                    approvalDate: 1,
+                    garageSelectedDate: 1,
+                    repairStartDate: 1,
+                    completedDate: 1,
 
-                    assignedOfficer: {
-                        name: {
-                            $concat: [
-                                { $ifNull: ["$insurance.firstName", ""] },
-                                " ",
-                                { $ifNull: ["$insurance.lastName", ""] }
-                            ]
-                        },
-                        phone: "$insurance.phoneNumber",
-                        email: "$insurance.email"
-                    },
+                    // ✅ vehicle object
+                    carBrand: { $ifNull: ["$car.brand", ""] },
+                    carModel: { $ifNull: ["$car.model", ""] },
+                    carColor: { $ifNull: ["$car.color", ""] },
+                    carYear: { $ifNull: ["$car.year", ""] },
+                    licensePlate: { $ifNull: ["$car.licensePlate", ""] },
+                    engineID: { $ifNull: ["$car.engineID", ""] },
 
-                    // --- สำคัญมาก: เพิ่มข้อมูลลูกค้าที่นี่ ---
-                    // คุณลืมใส่ข้อมูลลูกค้าใน $project
-                    customerName: {
-                        $concat: [
-                            { $ifNull: ["$customer.firstName", ""] },
-                            " ",
-                            { $ifNull: ["$customer.lastName", ""] }
-                        ]
-                    },
-                    customerPhone: { $ifNull: ["$customer.phoneNumber", "N/A"] },
-                    customerEmail: { $ifNull: ["$customer.email", "N/A"] }
+                    // ✅ garage object
+                    garageName: { $ifNull: ["$garage.garageName", null] },
+                    garagePhone: { $ifNull: ["$garage.phoneNumber", null] },
+                    garageEmail: { $ifNull: ["$garage.email", null] },
+                    garageAddress: { $ifNull: ["$garage.address", null] },
+                    garageDistance: { $ifNull: ["$garage.distance", null] },
+
+                    // ✅ assigned insurance officer
+                    insuranceFirstName: { $ifNull: ["$insurance.firstName", ""] },
+                    insuranceLastName: { $ifNull: ["$insurance.lastName", ""] },
+                    insuranceEmail: { $ifNull: ["$insurance.email", ""] },
+                    insurancePhone: { $ifNull: ["$insurance.phoneNumber", ""] },
+
+                    // ✅ customer (ถ้าจะใช้ในหน้าอื่น)
+                    customerFirstName: { $ifNull: ["$customer.firstName", ""] },
+                    customerLastName: { $ifNull: ["$customer.lastName", ""] },
+                    customerPhone: { $ifNull: ["$customer.phoneNumber", ""] },
+                    customerEmail: { $ifNull: ["$customer.email", ""] }
                 }
             }
         ]);
@@ -526,7 +546,14 @@ router.post("/:claimNumber/repair-items", async (req, res) => {
             remark
         });
 
-        res.json({ success: true, item });
+        // ✅ update total cost
+        const totalCost = await calculateTotalCost(claimNumber);
+        await Claim.findOneAndUpdate(
+            { claimNumber },
+            { estimatedCost: totalCost }
+        );
+
+        res.json({ success: true, item, totalCost });
 
     } catch (err) {
         console.error("Add repair item error:", err);
@@ -556,7 +583,14 @@ router.patch("/repair-items/:repairNumber", async (req, res) => {
             { new: true }
         );
 
-        res.json({ success: true, item: updated });
+        // ✅ คำนวณจาก claimNumber ของ repairItem ที่แก้
+        const totalCost = await calculateTotalCost(updated.claimNumber);
+        await Claim.findOneAndUpdate(
+            { claimNumber: updated.claimNumber },
+            { estimatedCost: totalCost }
+        );
+
+        res.json({ success: true, item: updated, totalCost });
 
     } catch (err) {
         console.error("Update repair item error:", err);
@@ -566,11 +600,21 @@ router.patch("/repair-items/:repairNumber", async (req, res) => {
 
 router.delete("/repair-items/:repairNumber", async (req, res) => {
     try {
-        await RepairItem.findOneAndDelete({
+        const deleted = await RepairItem.findOneAndDelete({
             repairNumber: req.params.repairNumber
         });
 
-        res.json({ success: true });
+        if (!deleted)
+            return res.json({ success: false });
+
+        // ✅ Recalculate
+        const totalCost = await calculateTotalCost(deleted.claimNumber);
+        await Claim.findOneAndUpdate(
+            { claimNumber: deleted.claimNumber },
+            { estimatedCost: totalCost }
+        );
+
+        res.json({ success: true, totalCost });
 
     } catch (err) {
         console.error("Delete repair item error:", err);
@@ -786,10 +830,13 @@ router.post(
 
             claim.detail = damageDescription;
             claim.inspectionDate = inspectionDate;
+            claim.status = "inspecting"
+            //claim.estimatedCost = tota
 
             if (mode === "submit") {
                 claim.state = "survey";
-                claim.currentStep = (claim.currentStep || 1) + 1;
+                claim.currentStep = 2;
+                claim.estimatedCost = await calculateTotalCost(claim.claimNumber);
             }
 
             console.log("[SAVE] 2. Saving claim details...");

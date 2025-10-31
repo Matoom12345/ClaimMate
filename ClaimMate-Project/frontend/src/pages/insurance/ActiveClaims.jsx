@@ -24,24 +24,12 @@ const ActiveClaims = () => {
   useEffect(() => {
     const fetchActiveClaims = async () => {
       try {
-        const res = await axios.get('http://localhost:3000/api/claims/active', {
-          params: { insuranceID: 'E00001' }
+        const insuranceID = localStorage.getItem("insuranceID");
+        const res = await axios.get('http://localhost:3000/api/claims/all', {
+          params: { insuranceID }
         });
         const claimsData = res.data;
         setClaims(claimsData);
-
-        const latestDates = await Promise.all(
-            claimsData.map(async (c) => {
-              try {
-                const res = await axios.get('http://localhost:3000/api/claim-history/latest', {
-                  params: { claimNumber: c.claimID }
-                });
-                return { [c.claimNumber]: res.data?.reportedDate || null };
-              } catch {
-                return { [c.claimNumber]: null };
-              }
-            })
-        );
 
         const mergedDates = Object.assign({}, ...latestDates);
         setLatestDates(mergedDates);
@@ -322,7 +310,7 @@ const ActiveClaims = () => {
                                   className="btn-primary flex-1 flex items-center justify-center gap-2"
                               >
                                 <span className="material-icons-round text-sm">edit</span>
-                                <span>อัปโหลดรายงาน</span>
+                                <span>บันทึกข้อมูล</span>
                               </Link>
 
                               <Link

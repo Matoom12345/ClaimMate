@@ -40,14 +40,16 @@ dotenv.config();
         const customersData = [
             { firstName: 'Harit',     lastName: 'Manoonnimit',   email: 'harit.man@ku.th',    citizenID: '1869900789127', phoneNumber: '0804484873' },
             { firstName: 'Dheerawat', lastName: 'Wongkhunmuang', email: 'dhee.won@ku.th',     citizenID: '1869903781946', phoneNumber: '0964403868' },
-            { firstName: 'Jinnaphat', lastName: 'Theparat',      email: 'jin.the@ku.th',      citizenID: '1869976496127', phoneNumber: '0996184224' },
+            { firstName: 'Jinnaphat', lastName: 'Theparat',      email: 'jinnaphat.th@ku.th',      citizenID: '1869976496127', phoneNumber: '0996184224' },
+
         ];
         const garagesData = [
             { firstName: 'Here', lastName: 'HongThong', email: 'hong.man@ku.th', phoneNumber: '0804484873', garageName: 'Here Hong', location: '1234 - las vegas' },
-            { firstName: 'Jae',  lastName: 'Pingpong',  email: 'ping.won@ku.th', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
+            { firstName: 'Jae',  lastName: 'Pingpong',  email: 'saniatheparat@gmail.com', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
         ];
         const insurancesData = [
-            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th', phoneNumber: '0964403868' }
+            { firstName: 'GG', lastName: 'EZ', email: 'jidapa.mah@ku.th', phoneNumber: '0964403868' },
+            { firstName: 'GGKUB', lastName: 'EZPEE', email: 'nambnanenia@gmail.com', phoneNumber: '0804474765' }
         ];
 
         // ❗ ห้ามใช้ insertMany กับโมเดลที่มี pre-hook gen id

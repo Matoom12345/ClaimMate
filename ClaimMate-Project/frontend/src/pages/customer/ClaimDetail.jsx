@@ -51,9 +51,9 @@ const ClaimDetail = () => {
 
         // ✅ assigned officer จาก backend
       const assignedOfficer = {
-        name: c.assignedOfficer?.name || "",
-        phone: c.assignedOfficer?.phone || "",
-        email: c.assignedOfficer?.email || ""
+        name: c.insuranceFirstName + " " + c.insuranceLastName || "",
+        phone: c.insurancePhone || "",
+        email: c.insuranceEmail || ""
       };
 
       // ✅ timeline mapping
