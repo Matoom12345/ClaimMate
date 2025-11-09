@@ -1,57 +1,50 @@
-// src/server.js
 const express = require('express');
-const mongoose = require('mongoose');
-const dotenv = require('dotenv');
 const cors = require('cors');
+const dotenv = require('dotenv');
+// const fileUpload = require('express-fileupload'); // (หากคุณยังต้องการใช้ file upload)
 
-// โหลดค่าจากไฟล์ .env
-dotenv.config();
+// Load environment variables
+dotenv.config({ path: '../.env' }); //
+
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Import Routes
-const testerRoute = require('./routes/testerRoute');
+// --- Middlewares ---
+// 1. Enable Cross-Origin Resource Sharing (CORS)
+app.use(cors());
 
-const carRoute = require('./routes/carRoute');
-const claimRoute = require('./routes/claimRoute');
-const authRoute = require('./routes/authRoute');
-const userRoute = require("./routes/userRoute");
-const urgentRequestRoute = require('./routes/urgentRequestRoute');
-const complaintRoute = require('./routes/complaintRoute');
-
-// Middleware
-app.use(cors({
-    origin: 'http://localhost:3001', // frontend port (React)
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-}));
+// 2. Enable JSON body parsing
 app.use(express.json());
 
-// ใช้งาน Route
-app.use('/users', testerRoute);
+// 3. (Optional) Enable File Uploads (หากคุณยังต้องการใช้)
+// app.use(
+//   fileUpload({
+//     useTempFiles: true,
+//   })
+// );
 
-app.use('/api/claims', claimRoute);
-app.use('/api/cars', carRoute);
-app.use('/api/auth', authRoute);
-app.use("/api/users", userRoute);
-app.use('/api/urgent-request', urgentRequestRoute);
-app.use('/api/complaint', complaintRoute);
-
-
-
-// เชื่อมต่อ MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-    .then(() => console.log('MongoDB connected successfully!'))
-    .catch((err) => console.error('MongoDB connection failed:', err));
-
-// Route ทดสอบหลัก
+// --- Basic Health Check Route ---
 app.get('/', (req, res) => {
-    res.send('Server + MongoDB connected successfully 🚀');
+    res.status(200).json({ message: 'Welcome to the API' });
 });
 
-// เริ่มเซิร์ฟเวอร์
+// --- Routes ---
+// (ในอนาคต คุณจะ import routes ของคุณมาไว้ที่นี่)
+// const authRoute = require('./routes/authRoute');
+// const claimRoute = require('./routes/claimRoute');
+// app.use('/api/auth', authRoute);
+// app.use('/api/claims', claimRoute);
+
+
+// --- Database Connection ---
+// (นี่คือจุดที่คุณจะเพิ่มโค้dเชื่อมต่อ Sequelize/SQLite ในอนาคต)
+// const sequelize = require('./config/database');
+// const connectDb = async () => { ... };
+// connectDb();
+
+
+// --- Start Server ---
+const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });

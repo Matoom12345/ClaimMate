@@ -1,28 +1,20 @@
-const mongoose = require('mongoose');
-const User = require('./User');
-const Counter = require('./Counter');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const insuranceSchema = new mongoose.Schema({
-    insuranceID: { type: String, unique: true },
-    position: { type: String, default: 'Surveyor' }
+const Insurance = sequelize.define('Insurance', {
+    id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+    },
+    // userId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติ
+    position: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+}, {
+    tableName: 'insurances',
+    timestamps: false,
 });
-
-// ✅ Generate insuranceID อัตโนมัติ
-insuranceSchema.pre('save', async function (next) {
-    if (this.isNew && !this.insuranceID) {
-
-        const counter = await Counter.findByIdAndUpdate(
-            'INSURANCE',
-            { $inc: { seq: 1 } },
-            { new: true, upsert: true }
-        );
-
-        this.insuranceID = `E${String(counter.seq).padStart(5, '0')}`;
-    }
-    next();
-});
-
-// ✅ Discriminator จาก User
-const Insurance = User.discriminator('insurance', insuranceSchema);
 
 module.exports = Insurance;

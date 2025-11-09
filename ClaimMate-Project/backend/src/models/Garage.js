@@ -1,24 +1,26 @@
-const mongoose = require('mongoose');
-const User = require('./User');
-const Counter = require('./Counter');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const garageSchema = new mongoose.Schema({
-    garageID:   { type: String, unique: true, required: true },
-    garageName: { type: String, required: true },
-    location:   { type: String },
-}, { _id: false }); // ใช้ _id เดียวกับ User (discriminator)
-
-garageSchema.pre('validate', async function (next) {
-    if (this.isNew && !this.garageID) {
-        const counter = await Counter.findByIdAndUpdate(
-            'GARAGE',
-            { $inc: { seq: 1 } },
-            { new: true, upsert: true }
-        );
-        this.garageID = `G${String(counter.seq).padStart(5, '0')}`;
-    }
-    next();
+const Garage = sequelize.define('Garage', {
+    id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+    },
+    // userId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติ
+    garageName: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    address: {
+        type: DataTypes.TEXT,
+    },
+    photoURL: {
+        type: DataTypes.STRING,
+    },
+}, {
+    tableName: 'garages',
+    timestamps: false,
 });
 
-const Garage = User.discriminator('garage', garageSchema);
 module.exports = Garage;

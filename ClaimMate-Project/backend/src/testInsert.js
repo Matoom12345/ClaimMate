@@ -45,7 +45,7 @@ dotenv.config();
 
         ];
         const garagesData = [
-            { firstName: 'Here', lastName: 'HongThong', email: 'hong.man@ku.th', phoneNumber: '0804484873', garageName: 'Here Hong', location: '1234 - las vegas' },
+            { firstName: 'Here', lastName: 'HongThong', email: 'haritzazatv@gmail.com', phoneNumber: '0804484873', garageName: 'Here Hong', location: '1234 - las vegas' },
             { firstName: 'Jae',  lastName: 'Pingpong',  email: 'saniatheparat@gmail.com', phoneNumber: '0964403868', garageName: 'Jae Ping',  location: '1234 - los Angeles' },
         ];
         const insurancesData = [

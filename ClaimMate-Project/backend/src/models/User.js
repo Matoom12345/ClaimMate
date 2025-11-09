@@ -1,22 +1,35 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-// ใช้ discriminatorKey เพื่อให้บอกได้ว่าเอกสารนี้เป็น subclass ไหน
-const options = { discriminatorKey: 'role', collection: 'users' };
+const User = sequelize.define('User', {
+    id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+    },
+    role: {
+        type: DataTypes.ENUM('customer', 'insurance', 'garage'),
+        allowNull: false,
+    },
+    firstName: {
+        type: DataTypes.STRING,
+    },
+    lastName: {
+        type: DataTypes.STRING,
+    },
+    email: {
+        type: DataTypes.STRING,
+        unique: true,
+        validate: {
+            isEmail: true,
+        },
+    },
+    phoneNumber: {
+        type: DataTypes.STRING,
+    },
+}, {
+    tableName: 'users',
+    timestamps: true, // สร้าง createdAt และ updatedAt
+});
 
-// Base Schema (Superclass)
-const userSchema = new mongoose.Schema({
-    firstName: { type: String, required: true },
-    lastName:  { type: String, required: true },
-    email:     { type: String, required: true, unique: true },
-    role: { type: String, default: 'insurance' }, // เพิ่ม default
-    phoneNumber:{ type: String, required: true},
-    avatar: { type: String, default: null },
-
-    // login
-    otp: { type: String, default: null },
-    otpExpires: { type: Date, default: null },
-}, options);
-
-// สร้าง model หลัก
-const User = mongoose.model('User', userSchema);
 module.exports = User;

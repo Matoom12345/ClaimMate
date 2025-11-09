@@ -1,12 +1,29 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const accidentPhotoSchema = new mongoose.Schema({
-    claimNumber: { type: String, required: true },
-    type: { type: String, enum: ["damage", "document"], default: "damage" },
-    caption: { type: String, default: null },
-    photoURL: { type: String, required: true },
+const AccidentPhoto = sequelize.define('AccidentPhoto', {
+    id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+    },
+    type: {
+        type: DataTypes.ENUM(
+            'damage','document'
+        ),
+        allowNull: false,
+    },
+    // claimId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติ
+    photoUrl: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    caption: {
+        type: DataTypes.STRING,
+    }
 }, {
-    timestamps: true
+    tableName: 'accident_photos',
+    timestamps: false,
 });
 
-module.exports = mongoose.model('AccidentPhoto', accidentPhotoSchema);
+module.exports = AccidentPhoto;

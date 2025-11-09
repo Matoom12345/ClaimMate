@@ -1,25 +1,28 @@
-const mongoose = require("mongoose");
-const Counter = require("./Counter");
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 
-const repairItemSchema = new mongoose.Schema({
-    repairNumber: { type:String, unique:true },
-    claimNumber:  { type:String, required:true },
-    type:         { type:String, required:true },
-    cost:         { type:Number, required:true },
-    remark:       { type:String, default:null }
-}, { timestamps:true });
-
-repairItemSchema.index({ claimNumber:1, createdAt:-1 });
-
-repairItemSchema.pre("validate", async function(next){
-    if (this.isNew && !this.repairNumber) {
-        const year = new Date().getFullYear().toString();
-        const counter = await Counter.findByIdAndUpdate(
-            `REPAIR-${year}`, { $inc:{ seq:1 } }, { new:true, upsert:true }
-        );
-        this.repairNumber = `RPR-${year}-${String(counter.seq).padStart(5,"0")}`;
-    }
-    next();
+const RepairItem = sequelize.define('RepairItem', {
+    id: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        primaryKey: true,
+    },
+    // claimId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติ
+    itemName: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    cost: {
+        type: DataTypes.FLOAT,
+        allowNull: false,
+    },
+    approved: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+}, {
+    tableName: 'repair_items',
+    timestamps: false,
 });
 
-module.exports = mongoose.model("RepairItem", repairItemSchema);
+module.exports = RepairItem;
