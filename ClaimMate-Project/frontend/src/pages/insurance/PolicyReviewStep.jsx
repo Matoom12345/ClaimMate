@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * PolicyReviewStep - หน้าแสดงรายละเอียดกรมธรรม์ก่อนเปิดเคส
  * เพื่อให้พนักงานตรวจสอบว่าลูกค้ามีความคุ้มครองตามที่แจ้งหรือไม่
  */
 const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
-  // ดึงข้อมูลประกันจาก customer (สมมติว่ามีใน customer.insuranceClass)
-  const insuranceClass = customer?.insuranceClass || '1'; // ค่าเริ่มต้นเป็นชั้น 1
-  const coverageAmount = customer?.insuranceCoverage || 0;
-  const policyNumber = customer?.policyNumber || '-';
+  // ✅ State สำหรับเปิด/ปิด dropdown ของแต่ละคัน
+  const [expandedVehicle, setExpandedVehicle] = useState(null);
+
+  const toggleVehicle = (carID) => {
+    setExpandedVehicle(expandedVehicle === carID ? null : carID);
+  };
 
   // ข้อมูลความคุ้มครองแต่ละชั้น
   const coverageDetails = {
@@ -17,6 +19,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองครบถ้วนที่สุด',
       color: 'primary',
       icon: 'verified',
+      coverageAmount: 500000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'check_circle', text: 'รถยนต์ตนเอง (ชน, กระแทก, คว่ำ, ตก)', included: true },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -35,6 +38,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองบางส่วน (ไฟไหม้ + รถคู่กรณี)',
       color: 'warning',
       icon: 'local_fire_department',
+      coverageAmount: 300000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -53,6 +57,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองเฉพาะไฟไหม้ + รถคู่กรณี',
       color: 'warning',
       icon: 'local_fire_department',
+      coverageAmount: 250000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -71,6 +76,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองเฉพาะรถคู่กรณี + ไฟไหม้บางส่วน',
       color: 'info',
       icon: 'directions_car',
+      coverageAmount: 150000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -89,6 +95,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองเฉพาะรถคู่กรณี (บังคับตามกฎหมาย)',
       color: 'neutral',
       icon: 'shield',
+      coverageAmount: 100000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก) - จำกัดวงเงิน', included: true },
@@ -104,17 +111,15 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
     },
   };
 
-  const currentCoverage = coverageDetails[insuranceClass] || coverageDetails['1'];
-
   return (
     <div className="min-h-screen bg-neutral-50 py-8">
       <div className="max-w-5xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <div className={`w-12 h-12 bg-${currentCoverage.color}-100 rounded-full flex items-center justify-center`}>
-              <span className={`material-icons-round text-2xl text-${currentCoverage.color}-600`}>
-                {currentCoverage.icon}
+            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+              <span className="material-icons-round text-2xl text-primary-600">
+                verified_user
               </span>
             </div>
             <div>
@@ -131,7 +136,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left - Policy Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Customer Info Card */}
+            {/* ✅ Customer Info Card - เหลือแค่ชื่อและบัตร */}
             <div className="card-static">
               <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
                 <span className="material-icons-round text-primary-500">person</span>
@@ -144,88 +149,155 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
                   <p className="font-semibold text-neutral-dark">{customer?.name}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500 mb-1">เลขกรมธรรม์</p>
-                  <p className="font-semibold text-primary-600">{policyNumber}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">ประเภทประกัน</p>
-                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-${currentCoverage.color}-100`}>
-                    <span className={`material-icons-round text-sm text-${currentCoverage.color}-700`}>
-                      {currentCoverage.icon}
-                    </span>
-                    <span className={`font-semibold text-${currentCoverage.color}-700`}>
-                      {currentCoverage.name}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-500 mb-1">วงเงินคุ้มครอง</p>
-                  <p className="font-bold text-lg text-primary-600">
-                    ฿{coverageAmount.toLocaleString()}
-                  </p>
+                  <p className="text-xs text-neutral-500 mb-1">เลขบัตรประชาชน</p>
+                  <p className="font-semibold text-neutral-dark">{customer?.citizenID}</p>
                 </div>
               </div>
             </div>
 
-            {/* Coverage Details Card */}
-            <div className="card-static">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-neutral-dark flex items-center gap-2">
-                  <span className="material-icons-round text-primary-500">description</span>
-                  ความคุ้มครอง - {currentCoverage.name}
-                </h2>
-                <span className="text-sm text-neutral-500">{currentCoverage.subtitle}</span>
-              </div>
+            {/* ✅ TODO: Vehicle Cards จะเพิ่มในขั้นตอนต่อไป */}
 
-              <div className="space-y-3">
-                {currentCoverage.coverages.map((coverage, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-3 p-3 rounded-lg ${
-                      coverage.included
-                        ? 'bg-success/10 border border-success/20'
-                        : 'bg-neutral-100 border border-neutral-200'
-                    }`}
-                  >
-                    <span
-                      className={`material-icons-round text-xl ${
-                        coverage.included ? 'text-success' : 'text-neutral-400'
-                      }`}
+            {/* ✅ Vehicle Cards - แสดงรถแต่ละคัน */}
+            <div className="space-y-4">
+              {(customer?.vehicles || []).map((vehicle) => {
+                // ดึงข้อมูลความคุ้มครองตามชั้นของรถ
+                const vehicleClass = vehicle.insuranceClass || '1';
+                const coverage = coverageDetails[vehicleClass] || coverageDetails['1'];
+                const isExpanded = expandedVehicle === vehicle.carID;
+
+                return (
+                  <div key={vehicle.carID} className="card-static">
+                    {/* Header - คลิกเพื่อเปิด/ปิด dropdown */}
+                    <button
+                      onClick={() => toggleVehicle(vehicle.carID)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 rounded-lg transition-colors"
                     >
-                      {coverage.icon}
-                    </span>
-                    <p
-                      className={`flex-1 text-sm ${
-                        coverage.included ? 'text-neutral-dark font-medium' : 'text-neutral-500'
-                      }`}
-                    >
-                      {coverage.text}
-                    </p>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 bg-${coverage.color}-100 rounded-lg flex items-center justify-center`}>
+                          <span className={`material-icons-round text-2xl text-${coverage.color}-600`}>
+                            directions_car
+                          </span>
+                        </div>
+
+                        <div className="text-left">
+                          <p className="font-semibold text-neutral-dark">
+                            {vehicle.brand} {vehicle.model} ({vehicle.year})
+                          </p>
+                          <p className="text-sm text-neutral-500">
+                            ทะเบียน: {vehicle.licensePlate} • สี: {vehicle.color}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className={`material-icons-round text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                        expand_more
+                      </span>
+                    </button>
+
+                    {/* Dropdown Content */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-neutral-200 space-y-6">
+                        {/* รายละเอียดกรมธรรม์ */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-neutral-500 mb-1">เลขกรมธรรม์</p>
+                            <p className="font-semibold text-primary-600">{vehicle.policyNumber || '-'}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-neutral-500 mb-1">ประเภทประกัน</p>
+                            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-${coverage.color}-100`}>
+                              <span className={`material-icons-round text-sm text-${coverage.color}-700`}>
+                                {coverage.icon}
+                              </span>
+                              <span className={`font-semibold text-${coverage.color}-700`}>
+                                {coverage.name}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-neutral-500 mb-1">วันเริ่มต้น</p>
+                            <p className="font-semibold text-neutral-dark">{vehicle.insuranceCreateAt || '-'}</p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-neutral-500 mb-1">วันหมดอายุ</p>
+                            <p className="font-semibold text-neutral-dark">{vehicle.insuranceExpireAt || '-'}</p>
+                          </div>
+
+                          <div className="col-span-2">
+                            <p className="text-xs text-neutral-500 mb-1">วงเงินคุ้มครอง</p>
+                            <p className="font-bold text-lg text-primary-600">
+                              ฿{coverage.coverageAmount.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ✅ TODO: ความคุ้มครอง + ข้อควรระวัง จะเพิ่มในขั้นตอนต่อไป */}
+
+                        {/* ✅ ความคุ้มครอง */}
+                        <div>
+                          <h3 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                            <span className="material-icons-round text-primary-500">description</span>
+                            ความคุ้มครอง - {coverage.name}
+                          </h3>
+
+                          <div className="space-y-2">
+                            {coverage.coverages.map((item, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-start gap-3 p-3 rounded-lg ${
+                                  item.included
+                                    ? 'bg-success/10 border border-success/20'
+                                    : 'bg-neutral-100 border border-neutral-200'
+                                }`}
+                              >
+                                <span
+                                  className={`material-icons-round text-lg ${
+                                    item.included ? 'text-success' : 'text-neutral-400'
+                                  }`}
+                                >
+                                  {item.icon}
+                                </span>
+                                <p
+                                  className={`flex-1 text-sm ${
+                                    item.included ? 'text-neutral-dark font-medium' : 'text-neutral-500'
+                                  }`}
+                                >
+                                  {item.text}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ✅ ข้อควรระวัง */}
+                        <div className="p-4 bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <span className="material-icons-round text-2xl text-warning">warning</span>
+                            <div>
+                              <h3 className="font-semibold text-neutral-dark mb-2">
+                                ข้อควรระวัง
+                              </h3>
+                              <ul className="space-y-1 text-sm text-neutral-600">
+                                {coverage.notes.map((note, index) => (
+                                  <li key={index} className="flex items-start gap-2">
+                                    <span className="material-icons-round text-xs text-warning mt-0.5">
+                                      arrow_right
+                                    </span>
+                                    <span>{note}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Important Notes */}
-            <div className="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20">
-              <div className="flex items-start gap-3">
-                <span className="material-icons-round text-2xl text-warning">warning</span>
-                <div>
-                  <h3 className="font-semibold text-neutral-dark mb-2">
-                    ข้อควรระวัง
-                  </h3>
-                  <ul className="space-y-1 text-sm text-neutral-600">
-                    {currentCoverage.notes.map((note, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <span className="material-icons-round text-xs text-warning mt-0.5">
-                          arrow_right
-                        </span>
-                        <span>{note}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -267,16 +339,6 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
                   <span>ยกเลิกการเปิดเคส</span>
                 </button>
               </div>
-            </div>
-
-            {/* Info Card */}
-            <div className="card bg-gradient-primary text-white">
-              <span className="material-icons-round text-4xl mb-3">info</span>
-              <h3 className="font-semibold mb-2">เกร็ดความรู้</h3>
-              <p className="text-sm text-white/90">
-                ประกันภัยชั้น 1 เหมาะสำหรับรถใหม่หรือรถที่มีมูลค่าสูง
-                เนื่องจากคุ้มครองครบถ้วนที่สุด รวมถึงภัยธรรมชาติและโจรกรรม
-              </p>
             </div>
           </div>
         </div>
