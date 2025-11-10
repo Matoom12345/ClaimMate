@@ -1,10 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
+const db = require('./models');
 // const fileUpload = require('express-fileupload'); // (หากคุณยังต้องการใช้ file upload)
 
 // Load environment variables
-dotenv.config({ path: '../.env' }); //
+dotenv.config({ path: path.resolve(__dirname, '../.env') }); //
 
 const app = express();
 
@@ -24,7 +26,7 @@ app.use(express.json());
 
 // --- Basic Health Check Route ---
 app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Welcome to the API' });
+    res.status(200).json({ message: 'ClaimMate API is running' });
 });
 
 // --- Routes ---
@@ -33,7 +35,8 @@ app.get('/', (req, res) => {
 // const claimRoute = require('./routes/claimRoute');
 // app.use('/api/auth', authRoute);
 // app.use('/api/claims', claimRoute);
-
+const authRoute = require('./routes/authRoute');
+app.use('/api/auth', authRoute);
 
 // --- Database Connection ---
 // (นี่คือจุดที่คุณจะเพิ่มโค้dเชื่อมต่อ Sequelize/SQLite ในอนาคต)
@@ -41,10 +44,28 @@ app.get('/', (req, res) => {
 // const connectDb = async () => { ... };
 // connectDb();
 
+// --- [เพิ่มส่วนนี้] เชื่อมต่อและ Sync ฐานข้อมูล Sequelize ---
+db.sequelize.authenticate()
+  .then(() => {
+    console.log('✅ SQLite database connected successfully.');
+
+    // สั่งให้ Sequelize สร้างตารางตาม Models ที่เรานิยามไว้
+    // force: true = ลบตารางเก่าทิ้งทั้งหมดแล้วสร้างใหม่ (เหมาะสำหรับ dev ตอนเริ่ม)
+    // force: false = ไม่ลบ (ใช้เมื่อข้อมูลเริ่มจริงจัง)
+    return db.sequelize.sync({ force: false }); 
+  })
+  .then(() => {
+    console.log('✅ All models were synchronized successfully.');
+  })
+  .catch(err => {
+    console.error('Unable to connect to the database:', err);
+  });
+// ----------------------------------------------------
+
 
 // --- Start Server ---
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server is running on port http://localhost:${PORT}`);
 });

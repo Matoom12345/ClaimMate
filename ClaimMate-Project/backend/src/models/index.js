@@ -9,8 +9,7 @@ const Car = require('./Car');
 const Claim = require('./Claim');
 const AccidentPhoto = require('./AccidentPhoto');
 const RepairItem = require('./RepairItem');
-const Complaint = require('./Complaint');
-const UrgentRequest = require('./UrgentRequest');
+// const UrgentRequest = require('./UrgentRequest');
 const Policy = require('./Policy'); // <-- [เพิ่ม] Import Policy
 const ClaimStatus = require('./ClaimStatus'); // <-- [เพิ่ม] Import ClaimStatus
 
@@ -26,8 +25,7 @@ const db = {
     Claim,
     AccidentPhoto,
     RepairItem,
-    Complaint,
-    UrgentRequest,
+    // UrgentRequest,
     Policy, // <-- [เพิ่ม]
     ClaimStatus // <-- [เพิ่ม]
 };
@@ -63,8 +61,8 @@ Car.belongsTo(Customer, { foreignKey: 'customerId' });
 Customer.hasMany(Claim, { foreignKey: 'customerId', onDelete: 'SET NULL' });
 Claim.belongsTo(Customer, { foreignKey: 'customerId' });
 
-UrgentRequest.hasOne(Claim, { foreignKey: 'claimId', onDelete: 'CASCADE' });
-Claim.belongsTo(UrgentRequest, { foreignKey: 'claimId' });
+// UrgentRequest.hasOne(Claim, { foreignKey: 'claimId', onDelete: 'CASCADE' });
+// Claim.belongsTo(UrgentRequest, { foreignKey: 'claimId' });
 
 Car.hasMany(Claim, { foreignKey: 'carId', onDelete: 'SET NULL' });
 Claim.belongsTo(Car, { foreignKey: 'carId' });
@@ -80,9 +78,6 @@ AccidentPhoto.belongsTo(Claim, { foreignKey: 'claimId' });
 
 Claim.hasMany(RepairItem, { foreignKey: 'claimId', onDelete: 'CASCADE' });
 RepairItem.belongsTo(Claim, { foreignKey: 'claimId' });
-
-Claim.hasOne(Complaint, { foreignKey: 'claimId', onDelete: 'CASCADE' });
-Complaint.belongsTo(Claim, { foreignKey: 'claimId' });
 
 
 module.exports = db;
