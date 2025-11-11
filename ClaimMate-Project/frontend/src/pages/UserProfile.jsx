@@ -220,19 +220,6 @@ const UserProfile = () => {
                     {user?.citizenID || '-'}
                   </div>
                 </div>
-
-                {/* ที่อยู่ */}
-                {user.address && (
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                      <span className="material-icons-round text-primary-500 text-lg">location_on</span>
-                      ที่อยู่
-                    </label>
-                    <div className="input-field bg-neutral-50 cursor-not-allowed">
-                      {user.address}
-                    </div>
-                  </div>
-                )}
               </>
             )}
 
@@ -258,17 +245,6 @@ const UserProfile = () => {
                   </label>
                   <div className="input-field bg-primary-50 cursor-not-allowed font-semibold text-primary-600">
                     {user?.employeeId || '-'}
-                  </div>
-                </div>
-
-                {/* ตำแหน่งงาน */}
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                    <span className="material-icons-round text-primary-500 text-lg">work</span>
-                    ตำแหน่งงาน
-                  </label>
-                  <div className="input-field bg-neutral-50 cursor-not-allowed">
-                    {user?.position || '-'}
                   </div>
                 </div>
               </>

@@ -8,10 +8,6 @@ const Insurance = sequelize.define('Insurance', {
         primaryKey: true,
     },
     // userId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติ
-    position: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
 }, {
     tableName: 'insurances',
     timestamps: false,
