@@ -44,7 +44,10 @@ const Policy = sequelize.define('Policy', {
     hooks: {
         // ตั้งค่า remainingBalance อัตโนมัติเมื่อสร้าง Policy ใหม่
         beforeCreate: (policy) => {
-            if (!policy.remainingBalance) {
+            
+            // เราจะตั้งค่า default เมื่อมันเป็น null หรือ undefined เท่านั้น
+            // เพราะ 0 ถือเป็นค่าที่ถูกต้อง (สำหรับชั้น 2 และ 3)
+            if (policy.remainingBalance === undefined || policy.remainingBalance === null) {
                 policy.remainingBalance = COVERAGE_AMOUNTS[policy.level];
             }
         }
