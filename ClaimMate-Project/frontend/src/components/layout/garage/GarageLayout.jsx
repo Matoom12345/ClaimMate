@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import GarageNavbar from './GarageNavbar';
 import GarageSidebar from './GarageSidebar';
 
@@ -8,23 +8,32 @@ import GarageSidebar from './GarageSidebar';
  * ประกอบด้วย: Navbar (บน) + Sidebar (ซ้าย) + Content (กลาง)
  */
 const GarageLayout = () => {
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [user, setUser] = useState(null);
 
-  // Mock garage data
-  const mockGarage = {
-    id: '1',
-    name: 'อู่สมชาย ห้วยขวาง',
-    phone: '02-123-4567',
-    email: 'somchai.garage@example.com',
-    address: '123 ถนนประชาราษฎร์ แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพมหานคร',
-    license: 'GAR-2024-001',
-  };
+  // ดึง user จาก localStorage หลัง login
+  useEffect(() => {
+    const stored = localStorage.getItem("claimmate_user");
+    if (!stored) {
+      navigate("/login");
+      return;
+    }
+
+    const parsed = JSON.parse(stored);
+    setUser(parsed);
+
+    //ถ้า role ไม่ใช่ garage → redirect ไปหน้าที่ถูกต้อง
+    if (parsed.role !== "garage") {
+      navigate(`/${parsed.role}/GarageDashboard`);
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Navbar */}
-      <GarageNavbar 
-        garage={mockGarage} 
+      <GarageNavbar
+        garage={user}
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
