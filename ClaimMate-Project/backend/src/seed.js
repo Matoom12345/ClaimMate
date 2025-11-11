@@ -378,7 +378,7 @@ async function seedDatabase() {
         console.log('Creating C8: เอก (2 cars, 1 completed claim)...');
         let userC8 = await db.User.create({
             role: 'customer', firstName: 'เอก', lastName: 'ใจดี',
-            email: 'aek@email.com', phoneNumber: '0888888888'
+            email: 'dheerawat.w@gmail.com', phoneNumber: '0888888888'
         });
         const customerC8 = await db.Customer.create({
             userId: userC8.id, citizenId: '8888888888888'
