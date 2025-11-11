@@ -38,7 +38,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองบางส่วน (ไฟไหม้ + รถคู่กรณี)',
       color: 'warning',
       icon: 'local_fire_department',
-      coverageAmount: 300000, // ✅ เพิ่มวงเงินตามชั้น
+      //coverageAmount: 300000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -57,7 +57,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองเฉพาะไฟไหม้ + รถคู่กรณี',
       color: 'warning',
       icon: 'local_fire_department',
-      coverageAmount: 250000, // ✅ เพิ่มวงเงินตามชั้น
+      //coverageAmount: 250000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -76,7 +76,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองเฉพาะรถคู่กรณี + ไฟไหม้บางส่วน',
       color: 'info',
       icon: 'directions_car',
-      coverageAmount: 150000, // ✅ เพิ่มวงเงินตามชั้น
+      //coverageAmount: 150000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
         { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
         { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
@@ -229,7 +229,7 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
                           <div className="col-span-2">
                             <p className="text-xs text-neutral-500 mb-1">วงเงินคุ้มครอง</p>
                             <p className="font-bold text-lg text-primary-600">
-                              ฿{coverage.coverageAmount.toLocaleString()}
+                              ฿{vehicle.balance ? parseFloat(vehicle.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                             </p>
                           </div>
                         </div>

@@ -11,6 +11,7 @@ const otpStore = new Map();
 router.post('/send-otp', async (req, res) => {
     try {
         const { email } = req.body;
+        console.log(`[AUTH DEBUG] Received email: "${email}"`);
 
         if (!email) {
             return res.status(400).json({

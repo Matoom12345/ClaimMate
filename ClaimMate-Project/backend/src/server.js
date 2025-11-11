@@ -29,14 +29,14 @@ app.get('/', (req, res) => {
     res.status(200).json({ message: 'ClaimMate API is running' });
 });
 
-// --- Routes ---
-// (ในอนาคต คุณจะ import routes ของคุณมาไว้ที่นี่)
-// const authRoute = require('./routes/authRoute');
-// const claimRoute = require('./routes/claimRoute');
-// app.use('/api/auth', authRoute);
-// app.use('/api/claims', claimRoute);
+const customerRoute = require('./routes/customerRoute'); // 1. Import customerRoute
+const claimRoute = require('./routes/claimRoute');       // 2. Import claimRoute
 const authRoute = require('./routes/authRoute');
+
+
 app.use('/api/auth', authRoute);
+app.use('/api/customers', customerRoute); // 1. ใช้งาน customerRoute
+app.use('/api/claims', claimRoute);       // 2. ใช้งาน claimRoute
 
 // --- Database Connection ---
 // (นี่คือจุดที่คุณจะเพิ่มโค้dเชื่อมต่อ Sequelize/SQLite ในอนาคต)
