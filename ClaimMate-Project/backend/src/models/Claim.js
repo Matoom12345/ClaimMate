@@ -33,8 +33,6 @@ const Claim = sequelize.define('Claim', {
         defaultValue: 0,
         allowNull: false,
     },
-    // เราลบคอลัมน์ 'status' ออกจากตารางนี้
-    // เพราะมันถูกย้ายไปที่ตาราง ClaimStatus.js แล้ว
 }, {
     tableName: 'claims',
     timestamps: true, // สร้าง createdAt และ updatedAt

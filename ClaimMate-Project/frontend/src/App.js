@@ -19,7 +19,6 @@ import ClaimList from './pages/customer/ClaimList';
 import ClaimDetail from './pages/customer/ClaimDetail';
 import SelectGarage from './pages/customer/SelectGarage';
 import UrgentRequest from './pages/customer/UrgentRequest';
-import Complaint from './pages/customer/Complaint';
 
 // Insurance Pages
 import ActiveClaims from './pages/insurance/ActiveClaims';
@@ -87,9 +86,6 @@ function App() {
           
           {/* Urgent Request - ขออนุมัติซ่อมด่วน */}
           <Route path="urgent-request" element={<UrgentRequest />} />
-          
-          {/* Complaint - แจ้งร้องเรียน */}
-          <Route path="complaint" element={<Complaint />} />
           
           {/* User Profile - ข้อมูลผู้ใช้ */}
           <Route path="profile" element={<UserProfile />} />

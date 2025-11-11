@@ -779,14 +779,6 @@ const ClaimDetail = () => {
                   <span className="material-icons-round">priority_high</span>
                   ขออนุมัติซ่อมด่วน
                 </Link>
-
-                <Link
-                    to="/customer/complaint"
-                    className="btn-ghost w-full flex items-center justify-center gap-2"
-                >
-                  <span className="material-icons-round">report_problem</span>
-                  แจ้งร้องเรียน
-                </Link>
               </div>
             </div>
           </div>

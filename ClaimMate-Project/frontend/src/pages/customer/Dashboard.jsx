@@ -294,24 +294,6 @@ const CustomerDashboard = () => {
                   chevron_right
                 </span>
               </Link>
-
-              <Link
-                to="/customer/complaint"
-                className="flex items-center gap-3 p-3 hover:bg-neutral-50 rounded-lg transition-colors"
-              >
-                <div className="w-12 h-12 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center">
-                  <span className="material-icons-round">report_problem</span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">แจ้งร้องเรียน</p>
-                  <p className="text-xs text-neutral-500">
-                    แจ้งปัญหาหรือข้อร้องเรียน
-                  </p>
-                </div>
-                <span className="material-icons-round text-neutral-400">
-                  chevron_right
-                </span>
-              </Link>
             </div>
           </div>
 
