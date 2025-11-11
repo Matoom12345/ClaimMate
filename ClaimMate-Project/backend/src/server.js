@@ -19,10 +19,16 @@ app.get('/', (req, res) => {
 });
 
 // --- Routes ---
+const customerRoute = require('./routes/customerRoute'); // 1. Import customerRoute
+const claimRoute = require('./routes/claimRoute');       // 2. Import claimRoute
 const authRoute = require('./routes/authRoute');
+
+
 const garageRoute = require('./routes/garageRoute');
 
 app.use('/api/auth', authRoute);
+app.use('/api/customers', customerRoute); // 1. ใช้งาน customerRoute
+app.use('/api/claims', claimRoute);       // 2. ใช้งาน claimRoute
 app.use('/api/garage', garageRoute);
 
 // --- Database Connection ---

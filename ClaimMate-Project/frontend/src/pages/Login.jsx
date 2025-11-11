@@ -317,7 +317,7 @@ const Login = () => {
                           label="อีเมล"
                           placeholder="your@email.com"
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          onChange={(e) => setEmail(e.target.value.trim())}
                           error={error}
                           icon="email"
                           required

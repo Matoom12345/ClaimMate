@@ -75,24 +75,31 @@ const CreateClaim = () => {
     setSelectedVehicleId(null);
 
     try {
-      const userRes = await axios.get(
-        `http://localhost:3000/api/users/by-idcard/${cleanIdCard}`
+      // --- [ แก้ไขตรงนี้ ] ---
+      // ลบ 2 call เก่าทิ้ง
+      // const userRes = await axios.get( ... );
+      // const carRes = await axios.get( ... );
+
+      // เรียก API ใหม่ที่เราสร้างเพียงเส้นเดียว
+      const res = await axios.get(
+          `http://localhost:3000/api/customers/search/by-idcard/${cleanIdCard}`
       );
 
-      const user = userRes.data.user;
-
-      const carRes = await axios.get(
-        `http://localhost:3000/api/cars/by-customer/${user.customerID}`
-      );
+      // ข้อมูล User และ Vehicles (Cars) มาพร้อมกันใน res.data.user
+      const customerData = res.data.user;
 
       setCustomerFound({
-        ...user,
-        vehicles: carRes.data.cars || [],
+        ...customerData,
+        vehicles: customerData.vehicles || [], // Backend ของเราส่ง 'vehicles' มาให้แล้ว
       });
+      // --- [ จบการแก้ไข ] ---
+
       setCurrentStep(2);
-    } catch {
+
+    } catch (err) { // แก้ไขการจัดการ error
       setCustomerFound(null);
-      setErrors({ idCard: "ไม่พบข้อมูลลูกค้า" });
+      // แสดงข้อความ error ที่ส่งมาจาก API (เช่น 'ไม่พบข้อมูลลูกค้า')
+      setErrors({ idCard: err.response?.data?.message || "ไม่พบข้อมูลลูกค้า" });
     }
 
     setSearchingCustomer(false);

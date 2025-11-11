@@ -24,7 +24,7 @@ async function seedDatabase() {
         // พนักงานคนที่ 1 (สมเกียรติ)
         const insuranceUser1 = await db.User.create({
             role: 'insurance', firstName: 'สมเกียรติ', lastName: 'ขยันยิ่ง',
-            email: 'staff1@claimmate.com', phoneNumber: '0810001111'
+            email: 'haritzazatv@gmail.com', phoneNumber: '0810001111'
         });
         const staff1 = await db.Insurance.create({ userId: insuranceUser1.id });
 
@@ -182,7 +182,7 @@ async function seedDatabase() {
         console.log('Creating C1: สมชาย (1 car, level 2)...');
         let userC1 = await db.User.create({
             role: 'customer', firstName: 'สมชาย', lastName: 'ใจดี',
-            email: 'somchai@email.com', phoneNumber: '0811111111'
+            email: 'harit.man@ku.th', phoneNumber: '0811111111'
         });
         const customerC1 = await db.Customer.create({
             userId: userC1.id, citizenId: '1111111111111'
