@@ -34,7 +34,6 @@ dotenv.config();
             { _id: 'CAR',      seq: 0 },
             { _id: 'CLAIMHISTORY', seq: 0 },
             { _id: 'REPAIR', seq: 0 },
-            { _id: 'COMPLAINT', seq: 0 }
         ]);
 
         // --- raw data ---

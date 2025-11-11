@@ -15,6 +15,11 @@ const Garage = sequelize.define('Garage', {
     address: {
         type: DataTypes.TEXT,
     },
+    googleMapsUrl: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'ลิงก์ Google Maps ของอู่',
+    },
     photoURL: {
         type: DataTypes.STRING,
     },

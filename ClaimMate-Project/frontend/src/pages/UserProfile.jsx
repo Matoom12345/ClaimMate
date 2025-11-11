@@ -12,27 +12,36 @@ import React, { useState, useEffect } from 'react';
 const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setTimeout(() => {
-      const stored = localStorage.getItem("claimmate_user");
-      if (!stored) {
+    const fetchProfile = async () => {
+      try {
+        const stored = localStorage.getItem("claimmate_user");
+        if (!stored) {
+          setLoading(false);
+          return;
+        }
+
+        const parsed = JSON.parse(stored);
+
+
+
+        setUser({ ...parsed });
         setLoading(false);
-        return;
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setError('ไม่สามารถโหลดข้อมูลได้');
+        setLoading(false);
       }
+    };
 
-      const parsed = JSON.parse(stored);
-
-
-
-      setUser({ ...parsed});
-      setLoading(false);
-    }, 500);
+    fetchProfile();
   }, []);
 
   // Get role-specific title
   const getRoleTitle = () => {
-    switch(user?.role) {
+    switch (user?.role) {
       case 'insurance':
         return 'บริษัทประกันภัย';
       case 'customer':
@@ -43,6 +52,17 @@ const UserProfile = () => {
         return 'ผู้ใช้';
     }
   };
+
+
+
+  // Get avatar initial
+  const getAvatarInitial = () => {
+    if (user?.role === 'garage') {
+      return user?.garageName?.charAt(0) || 'G';
+    }
+    return user?.firstName?.charAt(0) || 'U';
+  };
+
 
   if (loading) {
     return (
@@ -66,6 +86,17 @@ const UserProfile = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <span className="material-icons-round text-6xl text-error mb-4">error_outline</span>
+          <p className="text-error text-lg">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-8">
       <div className="w-full max-w-2xl">
@@ -81,13 +112,13 @@ const UserProfile = () => {
           <div className="flex flex-col items-center mb-8 pb-8 border-b border-neutral-200">
             <div className="w-24 h-24 bg-gradient-secondary rounded-full flex items-center justify-center text-white text-4xl font-bold shadow-lg mb-4">
               {user?.avatar ? (
-                <img 
-                  src={user.avatar} 
-                  alt={`${user?.firstName} ${user?.lastName}`} 
-                  className="w-full h-full rounded-full object-cover" 
+                <img
+                  src={user.avatar}
+                  alt={`${user?.firstName} ${user?.lastName}`}
+                  className="w-full h-full rounded-full object-cover"
                 />
               ) : (
-                <span>{user?.firstName?.charAt(0) || 'U'}</span>
+                <span>{getAvatarInitial()}</span>
               )}
             </div>
             <h2 className="text-2xl font-bold text-neutral-dark mb-2">
@@ -110,29 +141,62 @@ const UserProfile = () => {
 
           {/* Information */}
           <div className="space-y-6">
-            {/* ชื่อ */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                <span className="material-icons-round text-primary-500 text-lg">person</span>
-                ชื่อ
-              </label>
-              <div className="input-field bg-neutral-50 cursor-not-allowed">
-                {user?.firstName || '-'}
-              </div>
-            </div>
 
-            {/* นามสกุล */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                <span className="material-icons-round text-primary-500 text-lg">person</span>
-                นามสกุล
-              </label>
-              <div className="input-field bg-neutral-50 cursor-not-allowed">
-                {user?.lastName || '-'}
-              </div>
-            </div>
+            {/* Garage Only Fields */}
+            {user.role === 'garage' && (
+              <>
+                {/* ชื่ออู่ */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
+                    <span className="material-icons-round text-primary-500 text-lg">store</span>
+                    ชื่ออู่
+                  </label>
+                  <div className="input-field bg-neutral-50 cursor-not-allowed">
+                    {user?.garageName || '-'}
+                  </div>
+                </div>
 
-            {/* อีเมล */}
+                {/* ที่อยู่อู่ */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
+                    <span className="material-icons-round text-primary-500 text-lg">location_on</span>
+                    ที่อยู่
+                  </label>
+                  <div className="input-field bg-neutral-50 cursor-not-allowed">
+                    {user?.address || '-'}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Customer & Insurance Fields */}
+            {(user.role === 'customer' || user.role === 'insurance') && (
+              <>
+                {/* ชื่อ */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
+                    <span className="material-icons-round text-primary-500 text-lg">person</span>
+                    ชื่อ
+                  </label>
+                  <div className="input-field bg-neutral-50 cursor-not-allowed">
+                    {user?.firstName || '-'}
+                  </div>
+                </div>
+
+                {/* นามสกุล */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
+                    <span className="material-icons-round text-primary-500 text-lg">person</span>
+                    นามสกุล
+                  </label>
+                  <div className="input-field bg-neutral-50 cursor-not-allowed">
+                    {user?.lastName || '-'}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* อีเมล - ทุก role */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
                 <span className="material-icons-round text-primary-500 text-lg">email</span>
@@ -142,14 +206,14 @@ const UserProfile = () => {
                 {user?.email || '-'}
               </div>
             </div>
-            
+
             {/* Customer Only Fields */}
             {user.role === 'customer' && (
               <>
                 {/* เลขบัตรประชาชน */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                    <span className="material-icons-round text-primary-500 text-lg">person</span>
+                    <span className="material-icons-round text-primary-500 text-lg">badge</span>
                     เลขบัตรประชาชน
                   </label>
                   <div className="input-field bg-neutral-50 cursor-not-allowed">
@@ -159,7 +223,7 @@ const UserProfile = () => {
               </>
             )}
 
-            {/* เบอร์โทร */}
+            {/* เบอร์โทร - ทุก role */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
                 <span className="material-icons-round text-primary-500 text-lg">phone</span>
@@ -169,7 +233,6 @@ const UserProfile = () => {
                 {user?.phoneNumber || '-'}
               </div>
             </div>
-
 
             {/* Insurance Only Fields */}
             {user.role === 'insurance' && (
@@ -182,17 +245,6 @@ const UserProfile = () => {
                   </label>
                   <div className="input-field bg-primary-50 cursor-not-allowed font-semibold text-primary-600">
                     {user?.employeeId || '-'}
-                  </div>
-                </div>
-
-                {/* ตำแหน่งงาน */}
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-neutral-500">
-                    <span className="material-icons-round text-primary-500 text-lg">work</span>
-                    ตำแหน่งงาน
-                  </label>
-                  <div className="input-field bg-neutral-50 cursor-not-allowed">
-                    {user?.position || '-'}
                   </div>
                 </div>
               </>
@@ -221,11 +273,11 @@ const UserProfile = () => {
                 ข้อมูลแสดงผลอย่างเดียว
               </p>
               <p className="text-sm text-neutral-600">
-                {user.role === 'insurance' 
+                {user.role === 'insurance'
                   ? 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อฝ่ายทรัพยากรบุคคล'
                   : user.role === 'customer'
-                  ? 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อบริษัทประกันภัย'
-                  : 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อบริษัทประกันภัย'
+                    ? 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อบริษัทประกันภัย'
+                    : 'หากต้องการแก้ไขข้อมูล กรุณาติดต่อบริษัทประกันภัย'
                 }
               </p>
             </div>

@@ -134,7 +134,7 @@ const GarageDashboard = () => {
               <span className="material-icons-round">task_alt</span>
             </div>
           </div>
-          <p className="text-neutral-500 text-sm mb-1">เสร็จสิ้นวันนี้</p>
+          <p className="text-neutral-500 text-sm mb-1">เสร็จสิ้น</p>
           <h3 className="text-3xl font-bold text-success">{stats.completedToday}</h3>
         </div>
       </div>

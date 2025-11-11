@@ -8,9 +8,6 @@ const Customer = sequelize.define('Customer', {
         primaryKey: true,
     },
     // userId (Foreign Key) จะถูกเพิ่มโดยอัตโนมัติใน 'models/index.js'
-    address: {
-        type: DataTypes.TEXT,
-    },
     citizenId: {
         type: DataTypes.STRING,
         unique: true,

@@ -58,13 +58,6 @@ const CustomerSidebar = ({ collapsed = false }) => {
       path: '/customer/urgent-request',
       description: 'ขออนุมัติซ่อมด่วนฉุกเฉิน',
     },
-    {
-      id: 'complaint',
-      title: 'แจ้งร้องเรียน',
-      icon: 'report_problem',
-      path: '/customer/complaint',
-      description: 'แจ้งปัญหาหรือข้อร้องเรียน'
-    },
   ];
 
   const isActive = (path) => location.pathname === path;
