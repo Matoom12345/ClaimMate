@@ -71,7 +71,7 @@ router.get('/pending-requests', authenticate, async (req, res) => { // << เพ
         const pendingRequests = await ChooseGarageRequest.findAll({
             where: {
                 garageId: garage.id,
-                status: 'pending',
+                garageStatus: 'pending',
             },
             include: [
                 {
@@ -123,7 +123,7 @@ router.post('/requests/:id/accept', authenticate, async (req, res) => {
         }
 
         // 4. ตรวจสอบสถานะ (ป้องกันการกดซ้ำ)
-        if (request.status !== 'pending') {
+        if (request.garageStatus !== 'pending') {
             return res.status(400).json({ message: 'งานนี้ถูกดำเนินการไปแล้ว' });
         }
 
@@ -170,7 +170,7 @@ router.post('/requests/:id/reject', authenticate, async (req, res) => {
         }
 
         // 4. ตรวจสอบสถานะ
-        if (request.status !== 'pending') {
+        if (request.garageStatus !== 'pending') {
             return res.status(400).json({ message: 'งานนี้ถูกดำเนินการไปแล้ว' });
         }
 
