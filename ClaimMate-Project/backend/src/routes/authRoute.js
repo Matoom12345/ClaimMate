@@ -103,8 +103,6 @@ router.post('/verify-otp', async (req, res) => {
         otpStore.delete(email);
 
         // 2. ดึงข้อมูล user จาก database
-        // เราจะ 'include' โมเดลลูก (Customer, Insurance, Garage) ไปด้วย
-        // Sequelize จะเลือกอันที่ถูกต้องให้เองตาม 'role' ของ User
         const user = await db.User.findOne({
             where: { email: email },
             include: [
@@ -115,7 +113,6 @@ router.post('/verify-otp', async (req, res) => {
         });
 
         if (!user) {
-            // (เผื่อไว้ แต่ไม่ควรเกิด เพราะ /send-otp เช็กไปแล้ว)
             return res.status(404).json({
                 success: false,
                 message: 'ไม่พบผู้ใช้งาน'
@@ -133,10 +130,31 @@ router.post('/verify-otp', async (req, res) => {
             { expiresIn: '1d' } // Token หมดอายุใน 1 วัน
         );
 
+        // --- [ ✅ 4. แก้ไขตรงนี้: สร้าง Payload แบบ Flat ] ---
+        // 4.1. แปลง User (Sequelize object) เป็น JSON ธรรมดา
+        const userPayload = user.toJSON();
+
+        // 4.2. ดึง ID จาก Profile ที่ซ้อนอยู่ ออกมาไว้ข้างนอก
+        if (user.role === 'insurance' && userPayload.Insurance) {
+            userPayload.insuranceID = userPayload.Insurance.id; // ⬅️ นี่คือจุดที่แก้!
+            userPayload.company = userPayload.Insurance.company;
+        } else if (user.role === 'customer' && userPayload.Customer) {
+            userPayload.customerID = userPayload.Customer.id;
+        } else if (user.role === 'garage' && userPayload.Garage) {
+            userPayload.garageID = userPayload.Garage.id;
+        }
+
+        // 4.3. (Optional) ลบ Object ที่ซ้อนกันทิ้ง เพื่อความสะอาด
+        delete userPayload.Insurance;
+        delete userPayload.Customer;
+        delete userPayload.Garage;
+        // --- [ จบการแก้ไข ] ---
+
+
         res.json({
             success: true,
             message: 'เข้าสู่ระบบสำเร็จ',
-            user: user, // ส่งข้อมูล user ทั้งหมด (รวม profile ลูก)
+            user: userPayload, // ⬅️ ส่ง Payload ที่ "Flat" แล้วกลับไป
             token: token
         });
 

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Link, useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 
@@ -7,6 +8,40 @@ import PropTypes from 'prop-types';
  */
 const GarageSidebar = ({ collapsed = false }) => {
   const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    // (4) สร้างฟังก์ชันสำหรับดึงข้อมูล (คล้ายกับใน GaragePending)
+    const fetchPendingCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          // ถ้าไม่มี token ก็ไม่ต้องทำอะไร (badge จะเป็น 0)
+          console.warn('Sidebar: No token found, cannot fetch pending count.');
+          return;
+        }
+
+        // ยิง API เดิม
+        const response = await axios.get(
+          'http://localhost:8000/api/garage/pending-requests',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        // อัปเดต state ด้วย "จำนวน" (length) ของ array ที่ได้มา
+        setPendingCount(response.data.length);
+
+      } catch (err) {
+        // ถ้า error ก็แค่ log ไว้ ไม่ต้องแสดง error บน UI
+        console.error('Sidebar: Error fetching pending count:', err);
+      }
+    };
+
+    fetchPendingCount(); // สั่งให้ฟังก์ชันทำงาน
+  }, []); // [] ทำงานแค่ 1 ครั้งตอนโหลด
 
   const menuItems = [
     {
@@ -17,13 +52,15 @@ const GarageSidebar = ({ collapsed = false }) => {
       description: 'สถิติและภาพรวมอู่',
       exactMatch: true,
     },
-    {
+{
       id: 'pending',
       title: 'รอยืนยัน',
       icon: 'pending_actions',
       path: '/garage/pending',
       description: 'คำขอซ่อมที่รอยืนยัน',
-      badge: 3,
+      // นี่คือจุดที่แก้:
+      // ถ้า pendingCount มากกว่า 0 ให้แสดงตัวเลข, ถ้าไม่ (เป็น 0) ให้เป็น undefined (Badge จะไม่แสดง)
+      badge: pendingCount > 0 ? pendingCount : undefined,
     },
     {
       id: 'repairs',
@@ -63,7 +100,7 @@ const GarageSidebar = ({ collapsed = false }) => {
       ${collapsed ? 'w-20' : 'w-64'}
     `}>
       <div className={`${collapsed ? 'p-3' : 'p-6'}`}>
-        
+
         {collapsed ? (
           <nav className="space-y-2">
             {menuItems.map((item) => (
@@ -133,7 +170,7 @@ const GarageSidebar = ({ collapsed = false }) => {
                       <span className={`font-medium text-sm ${isActive(item.path, item.exactMatch) ? 'text-white' : ''}`}>
                         {item.title}
                       </span>
-                      
+
                       {item.badge && (
                         <span className={`
                           px-2 py-0.5 text-xs font-bold rounded-full
@@ -146,7 +183,7 @@ const GarageSidebar = ({ collapsed = false }) => {
                         </span>
                       )}
                     </div>
-                    
+
                     <p className={`
                       text-xs line-clamp-1
                       ${isActive(item.path, item.exactMatch) ? 'text-white/80' : 'text-neutral-400'}
