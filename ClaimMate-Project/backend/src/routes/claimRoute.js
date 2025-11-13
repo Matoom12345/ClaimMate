@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { Claim, ClaimStatus } = require('../models'); // นำเข้า Model ที่เกี่ยวข้อง
+const { Claim, ClaimStatus, Car } = require('../models'); // นำเข้า Model ที่เกี่ยวข้อง
+
 
 /**
  * @route   POST /api/claims
@@ -53,5 +54,78 @@ router.post('/', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+
+/**
+ * @route   GET /api/claims/customer/:customerId
+ * @desc    ดึงรายการเคลมทั้งหมดของลูกค้าคนหนึ่ง
+ * @access  Private (Customer)
+ */
+router.get('/customer/:customerId', async (req, res) => {
+    const { customerId } = req.params;
+    try {
+        const claims = await Claim.findAll({
+            where: { customerId },
+            include: [{ model: ClaimStatus },
+                {model: Car}]
+        });
+
+        // นับจำนวนแต่ละสถานะ
+        const summary = {
+            total: claims.length,
+            pending: claims.filter(c => c.ClaimStatuses?.some(s => s.status === 'pending')).length,
+            inProgress: claims.filter(c => c.ClaimStatuses?.some(s => s.status === 'in_progress')).length,
+            completed: claims.filter(c => c.ClaimStatuses?.some(s => s.status === 'completed')).length
+        };
+
+        res.status(200).json({ claims, summary });
+    } catch (error) {
+        console.error('Error fetching claims:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+/**
+ * @route   GET /api/claims/customer/:customerId/stats
+ * @desc    ดึงสถิติการเคลม (total, ongoing, completed)
+ * @access  Private (Customer)
+ */
+router.get('/customer/:customerId/stats', async (req, res) => {
+    const { customerId } = req.params;
+    try {
+        const claims = await Claim.findAll({
+            where: { customerId },
+            include: [{ model: ClaimStatus }],
+        });
+
+        const total = claims.length;
+
+        //  นับ "กำลังดำเนินการ" จาก state หรือ status ก็ได้
+        const ongoing = claims.filter(
+            c => c.ClaimStatuses?.some(
+                s =>
+                    ['pending', 'in_progress', 'open_case'].includes(s.status) ||
+                    ['pending', 'in_progress', 'open_case'].includes(s.state)
+            )
+        ).length;
+
+        // ✅ นับ "เสร็จสิ้น" จาก state หรือ status ก็ได้
+        const completed = claims.filter(
+            c => c.ClaimStatuses?.some(
+                s =>
+                    ['completed', 'closed_case'].includes(s.status) ||
+                    ['completed', 'closed_case'].includes(s.state)
+            )
+        ).length;
+
+        res.status(200).json({
+            stats: { total, ongoing, completed },
+        });
+    } catch (error) {
+        console.error('Error fetching claim stats:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+
 
 module.exports = router;

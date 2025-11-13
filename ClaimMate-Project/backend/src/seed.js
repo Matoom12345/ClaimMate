@@ -38,7 +38,7 @@ async function seedDatabase() {
         // พนักงานคนที่ 3 (วิชัย)
         const insuranceUser3 = await db.User.create({
             role: 'insurance', firstName: 'วิชัย', lastName: 'ว่องไว',
-            email: 'staff3@claimmate.com', phoneNumber: '0810003333'
+            email: 'dheerawat.w@ku.th', phoneNumber: '0810003333'
         });
         const staff3 = await db.Insurance.create({ userId: insuranceUser3.id });
 
@@ -500,16 +500,43 @@ async function seedDatabase() {
         });
         await db.ClaimStatus.create({
             claimId: claim3.id,
-            state: 'completed',
-            status: 'new',
-            currentStep: 6,
+            state: 'open_case',
+            status: 'in_progress',
+            currentStep:3,
             reportedDate: getDate(2025, 1, 15, 8, 30),
             inspectionDate: getDate(2025, 1, 16, 9, 0),
             approvalDate: getDate(2025, 1, 16, 13, 0),
             garageSelectedDate: getDate(2025, 1, 17, 10, 0),
             repairDate: getDate(2025, 1, 20, 9, 0),
             completedDate: getDate(2025, 1, 25, 17, 0),
-            isClosed: true
+            isClosed: false
+        });
+        // เคสที่ 4: ของ เอก (C8) - กำลังดำเนินการ
+        const claim4 = await db.Claim.create({
+            customerId: customerC8.id,
+            carId: carC8_1.id, // ใช้รถอีกคันของเอก
+            insuranceId: staff1.id, // พนักงานคนไหนก็ได้
+            garageId: garage1.id,
+            incidentDate: getDate(2025, 11, 1, 8, 30),
+            location: 'ถนนพหลโยธิน',
+            detail: 'เฉี่ยวด้านหน้าเล็กน้อย',
+            estimateCost: 12000.0,
+            additionalCost: 0,
+            approvedCost: 0 // ยังไม่อนุมัติ
+        });
+
+        await db.ClaimStatus.create({
+            claimId: claim4.id,
+            state: 'open_case',
+            status: 'in_progress', // ✅ ใช้สถานะนี้เพื่อให้ Dashboard จับได้
+            currentStep: 3,
+            reportedDate: getDate(2025, 11, 1, 9, 0),
+            inspectionDate: getDate(2025, 11, 2, 10, 0),
+            approvalDate: null,
+            garageSelectedDate: null,
+            repairDate: null,
+            completedDate: null,
+            isClosed: false
         });
         await db.AccidentPhoto.create({
             claimId: claim3.id, type: 'damage',
