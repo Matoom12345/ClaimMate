@@ -19,94 +19,74 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
       subtitle: 'คุ้มครองครบถ้วนที่สุด',
       color: 'primary',
       icon: 'verified',
-      coverageAmount: 500000, // ✅ เพิ่มวงเงินตามชั้น
       coverages: [
-        { icon: 'check_circle', text: 'รถยนต์ตนเอง (ชน, กระแทก, คว่ำ, ตก)', included: true },
-        { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
-        { icon: 'check_circle', text: 'ภัยธรรมชาติ (น้ำท่วม, พายุ, ลูกเห็บ)', included: true },
-        { icon: 'check_circle', text: 'ไฟไหม้, ระเบิด, ฟ้าผ่า', included: true },
-        { icon: 'check_circle', text: 'โจรกรรม (รถหาย)', included: true },
-        { icon: 'check_circle', text: 'อุบัติเหตุส่วนบุคคล (คนขับ/ผู้โดยสาร)', included: true },
+        { icon: 'check_circle', text: 'ชนมีคู่กรณี (รถชนรถ)', included: true },
+        { icon: 'check_circle', text: 'ชนไม่มีคู่กรณี (ชนฟุตบาท/เสาไฟฟ้า)', included: true },
+        { icon: 'check_circle', text: 'ไฟไหม้', included: true },
       ],
       notes: [
         'คุ้มครองทุกกรณีอุบัติเหตุ',
-        'เหมาะสำหรับรถใหม่และรถราคาสูง',
       ],
     },
     '2+': {
       name: 'ชั้น 2+',
-      subtitle: 'คุ้มครองบางส่วน (ไฟไหม้ + รถคู่กรณี)',
+      subtitle: 'คุ้มครองการชนที่ระบุคู่กรณีได้',
       color: 'warning',
-      icon: 'local_fire_department',
-      //coverageAmount: 300000, // ✅ เพิ่มวงเงินตามชั้น
+      icon: 'verified',
       coverages: [
-        { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
-        { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
-        { icon: 'cancel', text: 'ภัยธรรมชาติ (น้ำท่วม, พายุ)', included: false },
-        { icon: 'check_circle', text: 'ไฟไหม้, ระเบิด, ฟ้าผ่า', included: true },
-        { icon: 'check_circle', text: 'โจรกรรม (รถหายทั้งคัน)', included: true },
-        { icon: 'cancel', text: 'อุบัติเหตุส่วนบุคคล', included: false },
+        { icon: 'check_circle', text: 'ชนมีคู่กรณี (รถชนรถ หรือ ยานพาหนะทางบก ที่ระบุคู่กรณีได้เท่านั้น)', included: true },
+        { icon: 'cancel', text: 'ชนไม่มีคู่กรณี (ชนฟุตบาท/เสาไฟฟ้า)', included: false },
+        { icon: 'check_circle', text: 'ไฟไหม้', included: true },
       ],
       notes: [
-        'ไม่คุ้มครองความเสียหายรถตนเองจากการชน',
-        'คุ้มครองเฉพาะไฟไหม้และโจรกรรม',
+        'ไม่คุ้มครองความเสียหายรถตนเองจากการชนแบบไม่มีคู่กรณี',
+        'คุ้มครองเฉพาะกรณี รถชนรถ หรือ ยานพาหนะทางบกที่ระบุคู่กรณีได้เท่านั้น และคุ้มครองรถไฟไหม้',
       ],
     },
     '2': {
       name: 'ชั้น 2',
-      subtitle: 'คุ้มครองเฉพาะไฟไหม้ + รถคู่กรณี',
+      subtitle: 'คุ้มครองไฟไหม้',
       color: 'warning',
-      icon: 'local_fire_department',
-      //coverageAmount: 250000, // ✅ เพิ่มวงเงินตามชั้น
+      icon: 'verified',
       coverages: [
-        { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
-        { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
-        { icon: 'cancel', text: 'ภัยธรรมชาติ (น้ำท่วม, พายุ)', included: false },
-        { icon: 'check_circle', text: 'ไฟไหม้, ระเบิด, ฟ้าผ่า', included: true },
-        { icon: 'cancel', text: 'โจรกรรม', included: false },
-        { icon: 'cancel', text: 'อุบัติเหตุส่วนบุคคล', included: false },
+        { icon: 'cancel', text: 'ชนมีคู่กรณี (รถชนรถ หรือ ยานพาหนะทางบก ที่ระบุคู่กรณีได้เท่านั้น)', included: false },
+        { icon: 'cancel', text: 'ชนไม่มีคู่กรณี (ชนฟุตบาท/เสาไฟฟ้า)', included: false },
+        { icon: 'check_circle', text: 'ไฟไหม้', included: true },
       ],
       notes: [
-        'ไม่คุ้มครองความเสียหายรถตนเองจากการชน',
-        'ไม่คุ้มครองโจรกรรม',
+        'ไม่คุ้มครองความเสียหายรถตนเองจากทุกการชน',
+        'คุ้มครองเฉพาะกรณีไฟไหม้',
+        'ระบบไม่รองรับการประเมินความเสียหายต่อทรัพย์สินบุคคลภายนอก โปรดส่งต่อให้ฝ่ายที่เกี่ยวข้องเพื่อประเมินความเสียหายต่อทรัพย์สินบุคคลภายนอก (รถคู่กรณี)'
       ],
     },
     '3+': {
       name: 'ชั้น 3+',
-      subtitle: 'คุ้มครองเฉพาะรถคู่กรณี + ไฟไหม้บางส่วน',
+      subtitle: 'คุ้มครองรถชนรถ',
       color: 'info',
-      icon: 'directions_car',
-      //coverageAmount: 150000, // ✅ เพิ่มวงเงินตามชั้น
+      icon: 'verified',
       coverages: [
-        { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
-        { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก)', included: true },
-        { icon: 'cancel', text: 'ภัยธรรมชาติ', included: false },
-        { icon: 'check_circle', text: 'ไฟไหม้รถตนเอง (เฉพาะบางกรณี)', included: true },
-        { icon: 'cancel', text: 'โจรกรรม', included: false },
-        { icon: 'cancel', text: 'อุบัติเหตุส่วนบุคคล', included: false },
+        { icon: 'check_circle', text: 'ชนมีคู่กรณี (รถชนรถ ที่ระบุคู่กรณีได้เท่านั้น)', included: true },
+        { icon: 'cancel', text: 'ชนไม่มีคู่กรณี (ชนฟุตบาท/เสาไฟฟ้า)', included: false },
+        { icon: 'cancel', text: 'ไฟไหม้', included: false },
       ],
       notes: [
-        'คุ้มครองหลักคือความเสียหายต่อบุคคลภายนอก',
-        'ไม่คุ้มครองรถตนเองจากการชน',
+        'คุ้มครองเฉพาะกรณี รถชนรถ ที่ระบุคู่กรณีได้เท่านั้น',
+        'ไม่คุ้มครองรถไฟไหม้',
       ],
     },
     '3': {
-      name: 'ชั้น 3 (พ.ร.บ.)',
-      subtitle: 'คุ้มครองเฉพาะรถคู่กรณี (บังคับตามกฎหมาย)',
+      name: 'ชั้น 3',
+      subtitle: 'คุ้มครองเฉพาะรถคู่กรณี',
       color: 'neutral',
-      icon: 'shield',
-      coverageAmount: 100000, // ✅ เพิ่มวงเงินตามชั้น
+      icon: 'verified',
       coverages: [
-        { icon: 'cancel', text: 'รถยนต์ตนเอง (ชน, กระแทก)', included: false },
-        { icon: 'check_circle', text: 'รถยนต์คู่กรณี (บุคคลภายนอก) - จำกัดวงเงิน', included: true },
-        { icon: 'cancel', text: 'ภัยธรรมชาติ', included: false },
+        { icon: 'cancel', text: 'ชนมีคู่กรณี (รถชนรถ หรือ ยานพาหนะทางบก ที่ระบุคู่กรณีได้เท่านั้น)', included: false },
+        { icon: 'cancel', text: 'ชนไม่มีคู่กรณี (ชนฟุตบาท/เสาไฟฟ้า)', included: false },
         { icon: 'cancel', text: 'ไฟไหม้', included: false },
-        { icon: 'cancel', text: 'โจรกรรม', included: false },
-        { icon: 'cancel', text: 'อุบัติเหตุส่วนบุคคล', included: false },
       ],
       notes: [
-        'คุ้มครองแค่ความเสียหายต่อบุคคลภายนอกเท่านั้น',
-        'ไม่คุ้มครองรถตนเองเลย',
+        'คุ้มครองเฉพาะความเสียหายต่อรถคู่กรณีเท่านั้น',
+        'ระบบไม่รองรับการประเมินความเสียหายต่อทรัพย์สินบุคคลภายนอก โปรดส่งต่อให้ฝ่ายที่เกี่ยวข้องเพื่อประเมินความเสียหายต่อทรัพย์สินบุคคลภายนอก (รถคู่กรณี)'
       ],
     },
   };
@@ -247,23 +227,20 @@ const PolicyReviewStep = ({ customer, onContinue, onCancel }) => {
                             {coverage.coverages.map((item, index) => (
                               <div
                                 key={index}
-                                className={`flex items-start gap-3 p-3 rounded-lg ${
-                                  item.included
-                                    ? 'bg-success/10 border border-success/20'
-                                    : 'bg-neutral-100 border border-neutral-200'
-                                }`}
+                                className={`flex items-start gap-3 p-3 rounded-lg ${item.included
+                                  ? 'bg-success/10 border border-success/20'
+                                  : 'bg-neutral-100 border border-neutral-200'
+                                  }`}
                               >
                                 <span
-                                  className={`material-icons-round text-lg ${
-                                    item.included ? 'text-success' : 'text-neutral-400'
-                                  }`}
+                                  className={`material-icons-round text-lg ${item.included ? 'text-success' : 'text-neutral-400'
+                                    }`}
                                 >
                                   {item.icon}
                                 </span>
                                 <p
-                                  className={`flex-1 text-sm ${
-                                    item.included ? 'text-neutral-dark font-medium' : 'text-neutral-500'
-                                  }`}
+                                  className={`flex-1 text-sm ${item.included ? 'text-neutral-dark font-medium' : 'text-neutral-500'
+                                    }`}
                                 >
                                   {item.text}
                                 </p>

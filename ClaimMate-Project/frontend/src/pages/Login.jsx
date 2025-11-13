@@ -75,9 +75,12 @@ const Login = () => {
 
       if (res.data.success) {
         const user = res.data.user;
+        const token = res.data.token;
 
         // ✅ เก็บ user ลง localStorage
         localStorage.setItem('claimmate_user', JSON.stringify(user));
+
+        localStorage.setItem('token', token);
 
         // ✅ Redirect ตาม role
         const roleRoutes = {

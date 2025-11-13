@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models');
+const { ChooseGarageRequest, Claim, Customer, Car, Garage, User } = require('../models');
+const authenticate = require('../middlewares/authenticate');
 
 // ============================================
 // Garage Routes
@@ -18,15 +20,15 @@ router.get('/dashboard', async (req, res) => {
         });
 
         const activeCount = await db.Claim.count({
-            where: { 
+            where: {
                 garageId,
-                '$ClaimStatus.state$': 'repair' 
+                '$ClaimStatus.state$': 'repair'
             },
             include: [{ model: db.ClaimStatus }]
         });
 
         const approvalsCount = await db.AdditionalApprove.count({
-            where: { 
+            where: {
                 approvalStatus: 'pending',
                 '$Claim.garageId$': garageId
             },
@@ -50,108 +52,145 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // 📋 GET /api/garage/pending - รายการรอยืนยัน
-router.get('/pending', async (req, res) => {
+router.get('/pending-requests', authenticate, async (req, res) => { // << เพิ่ม authenticate ตรงนี้
     try {
-        const garageId = req.query.garageId;
+        const userId = req.user.id; // << ใช้งานจาก middleware
 
-        const requests = await db.ChooseGarageRequest.findAll({
-            where: { 
-                garageId,
-                garageStatus: 'pending' 
+        // 1. หา GarageId จาก UserId
+        const garage = await Garage.findOne({ where: { userId: userId } });
+
+        if (!garage) {
+            // ตรวจสอบ Role ด้วย (เผื่อ Customer มาเรียก)
+            if (req.user.role !== 'GARAGE') {
+                return res.status(403).json({ message: 'คุณไม่มีสิทธิ์เข้าถึงส่วนนี้' });
+            }
+            return res.status(404).json({ message: 'ไม่พบข้อมูลอู่ (โปรดตรวจสอบว่าผูกบัญชีอู่กับ User นี้แล้ว)' });
+        }
+
+        // 2. ดึงคำขอที่รออนุมัติ (status: 'pending') สำหรับอู่นี้
+        const pendingRequests = await ChooseGarageRequest.findAll({
+            where: {
+                garageId: garage.id,
+                garageStatus: 'pending',
             },
             include: [
                 {
-                    model: db.Claim,
+                    model: Claim,
+                    as: 'Claim',
                     include: [
-                        { model: db.Car },
-                        { model: db.Customer },
-                        { model: db.ClaimStatus },
-                        { model: db.RepairItem }
-                    ]
-                }
+                        {
+                            model: Customer,
+                            as: 'Customer',
+                            include: [{ model: User, as: 'User' }]
+                        },
+                        {
+                            model: Car,
+                            as: 'Car',
+                        },
+                    ],
+                },
             ],
-            order: [['requestDate', 'DESC']]
+            order: [['createdAt', 'ASC']],
         });
 
-        res.json({
-            success: true,
-            data: requests
-        });
+        res.status(200).json(pendingRequests);
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        console.error('Error fetching pending requests:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูล', error: error.message });
+    }
+});
+router.post('/requests/:id/accept', authenticate, async (req, res) => {
+    try {
+        const requestId = req.params.id; // นี่คือ ID ของ ChooseGarageRequest
+        const userId = req.user.id; // ID ของ User ที่ล็อกอิน (จาก middleware)
+
+        // 1. ค้นหาอู่ที่ล็อกอินอยู่
+        const garage = await Garage.findOne({ where: { userId: userId } });
+        if (!garage) {
+            return res.status(403).json({ message: 'คุณไม่มีสิทธิ์ดำเนินการ' });
+        }
+
+        // 2. ค้นหาใบคำขอ (ChooseGarageRequest)
+        const request = await ChooseGarageRequest.findByPk(requestId);
+        if (!request) {
+            return res.status(404).json({ message: 'ไม่พบคำขอนี้' });
+        }
+
+        // 3. ตรวจสอบสิทธิ์ (Authorization) ว่าอู่ที่ล็อกอิน เป็นอู่ที่ถูกเลือกจริง
+        if (request.garageId !== garage.id) {
+            return res.status(403).json({ message: 'คุณไม่มีสิทธิ์รับงานนี้' });
+        }
+
+        // 4. ตรวจสอบสถานะ (ป้องกันการกดซ้ำ)
+        if (request.garageStatus !== 'pending') {
+            return res.status(400).json({ message: 'งานนี้ถูกดำเนินการไปแล้ว' });
+        }
+
+        // 5. อัปเดตสถานะใบคำขอ (ChooseGarageRequest)
+        request.status = 'accepted';
+        await request.save();
+
+        // 6. อัปเดตสถานะเคสหลัก (Claim) (ตามโฟลว์ P22: สถานะลูกค้าอัปเดตเป็น "กำลังซ่อม")
+        const claim = await Claim.findByPk(request.claimId);
+        if (claim) {
+            // ใช้ค่า ENUM จาก 'ClaimStatus.js'
+            claim.status = 'REPAIRING';
+            await claim.save();
+        }
+
+        res.status(200).json({ message: 'รับงานสำเร็จ', request });
+
+    } catch (error) {
+        console.error('Error accepting job:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: error.message });
     }
 });
 
-// ✅ POST /api/garage/accept-repair - ยืนยันรับซ่อม
-router.post('/accept-repair', async (req, res) => {
+router.post('/requests/:id/reject', authenticate, async (req, res) => {
     try {
-        const { requestId } = req.body;
+        const requestId = req.params.id; // ID ของ ChooseGarageRequest
+        const userId = req.user.id;
 
-        const request = await db.ChooseGarageRequest.findByPk(requestId);
-        
-        if (!request) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบคำขอ'
-            });
+        // 1. ค้นหาอู่
+        const garage = await Garage.findOne({ where: { userId: userId } });
+        if (!garage) {
+            return res.status(403).json({ message: 'คุณไม่มีสิทธิ์ดำเนินการ' });
         }
 
-        // Update request status
-        await request.update({
-            garageStatus: 'accepted',
-            responseDate: new Date()
-        });
-
-        // Update claim status
-        await db.ClaimStatus.update(
-            { state: 'repair', status: 'inspecting' },
-            { where: { claimId: request.claimId }}
-        );
-
-        res.json({
-            success: true,
-            message: 'ยืนยันรับซ่อมสำเร็จ'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// ❌ POST /api/garage/reject-repair - ปฏิเสธงานซ่อม
-router.post('/reject-repair', async (req, res) => {
-    try {
-        const { requestId, reason } = req.body;
-
-        const request = await db.ChooseGarageRequest.findByPk(requestId);
-        
+        // 2. ค้นหาใบคำขอ
+        const request = await ChooseGarageRequest.findByPk(requestId);
         if (!request) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบคำขอ'
-            });
+            return res.status(404).json({ message: 'ไม่พบคำขอนี้' });
         }
 
-        await request.update({
-            garageStatus: 'rejected',
-            responseDate: new Date(),
-            rejectReason: reason
-        });
+        // 3. ตรวจสอบสิทธิ์
+        if (request.garageId !== garage.id) {
+            return res.status(403).json({ message: 'คุณไม่มีสิทธิ์ปฏิเสธงานนี้' });
+        }
 
-        res.json({
-            success: true,
-            message: 'ปฏิเสธงานสำเร็จ'
-        });
+        // 4. ตรวจสอบสถานะ
+        if (request.garageStatus !== 'pending') {
+            return res.status(400).json({ message: 'งานนี้ถูกดำเนินการไปแล้ว' });
+        }
+
+        // 5. อัปเดตสถานะใบคำขอ (ChooseGarageRequest)
+        request.status = 'rejected';
+        await request.save();
+
+        // 6. อัปเดตสถานะเคสหลัก (Claim) (ตามโฟลว์ P13: ลูกค้ากลับไปเลือกอู่ใหม่)
+        const claim = await Claim.findByPk(request.claimId);
+        if (claim) {
+            // ใช้ค่า ENUM จาก 'ClaimStatus.js'
+            claim.status = 'PENDING_GARAGE'; // "รอการเลือกอู่"
+            await claim.save();
+        }
+
+        res.status(200).json({ message: 'ปฏิเสธงานสำเร็จ', request });
+
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        console.error('Error rejecting job:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาด', error: error.message });
     }
 });
 
@@ -258,11 +297,11 @@ router.post('/complete-repair', async (req, res) => {
         const { claimId } = req.body;
 
         await db.ClaimStatus.update(
-            { 
+            {
                 state: 'completed',
                 completedDate: new Date()
             },
-            { where: { claimId }}
+            { where: { claimId } }
         );
 
         res.json({

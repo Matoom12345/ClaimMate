@@ -31,7 +31,7 @@ async function seedDatabase() {
         // พนักงานคนที่ 2 (อารยา)
         const insuranceUser2 = await db.User.create({
             role: 'insurance', firstName: 'อารยา', lastName: 'ใจดี',
-            email: 'staff2@claimmate.com', phoneNumber: '0810002222'
+            email: 'saniatheparat@gmail.com', phoneNumber: '0810002222'
         });
         const staff2 = await db.Insurance.create({ userId: insuranceUser2.id });
 
@@ -47,14 +47,14 @@ async function seedDatabase() {
 
         // อู่ที่ 1 (มีรูป)
         let garageUser1 = await db.User.create({
-            role: 'garage', firstName: 'อู่เค รุ่งเรือง', lastName: 'บริการ',
-            email: 'garage1@claimmate.com', phoneNumber: '026158658'
+            role: 'garage', firstName: 'อู่ซาเนีย', lastName: 'เดินบนดิน',
+            email: 'jinnaphat.th@ku.th', phoneNumber: '026158658'
         });
         const garage1 = await db.Garage.create({
             userId: garageUser1.id,
             garageName: 'บจ. เค. รุ่งเรืองบริการ',
             address: '6/9-10 ถ.พหลโยธิน แขวงสามเสนใน เขตพญาไท กรุงเทพฯ 10400',
-            googleMapsUrl: null,
+            googleMapsUrl: 'https://maps.app.goo.gl/q7XmD5GgZbGGmep59',
             photoURL: 'https://res.cloudinary.com/demo/image/upload/c_fill,h_200,w_300/garage_1.jpg'
         });
 
@@ -286,11 +286,11 @@ async function seedDatabase() {
         // C5: วีระ (เงื่อนไข: มีรถ 5 คัน)
         console.log('Creating C5: วีระ (5 cars)...');
         let userC5 = await db.User.create({
-            role: 'customer', firstName: 'วีระ', lastName: 'กล้าหาญ',
-            email: 'veera@email.com', phoneNumber: '0855555555'
+            role: 'customer', firstName: 'วีระ', lastName: 'เทพรัตน์',
+            email: 'nambnanenia@gmail.com', phoneNumber: '0855555555'
         });
         const customerC5 = await db.Customer.create({
-            userId: userC5.id, citizenId: '5555555555555'
+            userId: userC5.id, citizenId: '1104700093000'
         });
         // รถ 5 คัน
         let carC5_1 = await db.Car.create({ customerId: customerC5.id, brand: 'Honda', model: 'Accord', year: 2022, color: 'Silver', engineID: 'ENG-C5-1', licensePlate: 'ทท 1' });
