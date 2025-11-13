@@ -11,9 +11,11 @@ const AccidentPhoto = require('./AccidentPhoto');
 const RepairItem = require('./RepairItem');
 const UrgentRequest = require('./UrgentRequest');
 const AdditionalApprove = require('./AdditionalApprove');
+const AdditionalSurvey = require('./AdditionalSurvey');
 const ChooseGarageRequest = require('./ChooseGarageRequest');
 const Policy = require('./Policy');
 const ClaimStatus = require('./ClaimStatus');
+const Satisfaction = require('./Satisfaction');
 
 // 2. สร้าง Object db
 const db = {
@@ -29,9 +31,11 @@ const db = {
     RepairItem,
     UrgentRequest,
     AdditionalApprove,
+    AdditionalSurvey,
     ChooseGarageRequest,
     Policy,
-    ClaimStatus
+    ClaimStatus,
+    Satisfaction
 };
 
 // 3. กำหนดความสัมพันธ์ (Associations) ตาม ERD
@@ -86,9 +90,17 @@ RepairItem.belongsTo(Claim, { foreignKey: 'claimId' });
 Claim.hasOne(UrgentRequest, { foreignKey: 'claimId', onDelete: 'CASCADE' });
 UrgentRequest.belongsTo(Claim, { foreignKey: 'claimId' });
 
+// Claim <-> Satisfaction (One-to-One)
+Claim.hasOne(Satisfaction, { foreignKey: 'claimId', onDelete: 'CASCADE' });
+Satisfaction.belongsTo(Claim, { foreignKey: 'claimId' });
+
 // Claim <-> AdditionalApprove (One-to-Many)
 Claim.hasMany(AdditionalApprove, { foreignKey: 'claimId', onDelete: 'CASCADE' });
 AdditionalApprove.belongsTo(Claim, { foreignKey: 'claimId' });
+
+// Claim <-> AdditionalSurvey (One-to-Many)
+Claim.hasMany(AdditionalSurvey, { foreignKey: 'claimId', onDelete: 'CASCADE' });
+AdditionalSurvey.belongsTo(Claim, { foreignKey: 'claimId' });
 
 // Claim + Garage <-> ChooseGarageRequest (Many-to-One)
 Claim.hasMany(ChooseGarageRequest, { foreignKey: 'claimId', onDelete: 'CASCADE' });

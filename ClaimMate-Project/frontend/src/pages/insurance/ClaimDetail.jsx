@@ -68,98 +68,92 @@ const ClaimDetail = () => {
       try {
         setLoading(true);
 
-        const [detailRes, fullRes] = await Promise.all([
-          axios.get(`http://localhost:3000/api/claims/detail/${id}`),
-          axios.get(`http://localhost:3000/api/claims/full-detail/${id}`),
-        ]);
+        // (แก้ไข) ⭐️ เรียก API แค่ครั้งเดียว
+        const res = await axios.get(`http://localhost:3000/api/claims/detail-report/${id}`);
 
-        // 1) ข้อมูลสรุป (join)
-        const detail = detailRes.data?.claim || null;
+        // (แก้ไข) ⭐️ แยกข้อมูลจาก Response ใหม่
+        const detail = res.data.claim || null;         // (ข้อมูล Header UI)
+        const full = res.data || {};
+        const rawClaim = full.claimRaw || {};          // (ข้อมูล Raw Form)
+        const rawPhotos = full.photos || [];         // (ข้อมูลรูป)
+        const rawItems = full.repairItems || [];       // (ข้อมูลรายการซ่อม)
 
-        // 2) ข้อมูลเต็ม (claim raw + photos + repairItems)
-        const full = fullRes.data || {};
-        const rawClaim = full.claim || {};
-        const rawPhotos = full.photos || [];
-        const rawItems = full.repairItems || [];
 
-        // ประกอบ object claim สำหรับ header/summary UI เดิม (อย่าแตะโครง UI)
+        if (!detail || !rawClaim) {
+          throw new Error('Claim data not found in response');
+        }
+
+        // 1) (แก้ไข) ประกอบ object claim สำหรับ header/summary UI
         const claimForUI = {
-          id: detail?.id || rawClaim?._id || id,
-          claimNumber: detail?.claimNumber || rawClaim?.claimNumber || id,
-          status: detail?.state || rawClaim?.state || 'new',
-          priority: detail?.priorityLevel || 'normal',
+          id: detail.id,
+          claimNumber: detail.claimNumber,
+          status: detail.status,
+          // (คำสั่ง 1: priority ถูกตัดออก)
 
           customerName: detail.customerFirstName + " " + detail.customerLastName || '-',
-          customerPhone: detail?.customerPhone || '-',
-          customerEmail: detail?.assignedOfficer?.email || '-', // ไม่มีใน join ฝั่งลูกค้าโดยตรง
+          customerPhone: detail.customerPhone || '-',
+          customerEmail: detail.customerEmail || '-',
 
-          policyNumber: detail?.policyNumber || '-',
+          policyNumber: detail.policyNumber || '-',
           vehicle: {
-            brand: detail?.carBrand || '',
-            model: detail?.carModel || '',
-            year: detail?.carYear || '',
-            licensePlate: detail?.licensePlate || '',
-            chassisNumber: detail?.engineID || '',
-            color: detail?.carColor || '',
-            // ⭐️ (แก้ไข) ใช้ insuranceBalance จาก Model (ถ้ามี) หรือ 25000
-            insuranceCoverage: detail?.insuranceBalance || rawClaim?.insuranceBalance || 25000,
+            brand: detail.carBrand || '',
+            model: detail.carModel || '',
+            year: detail.carYear || '',
+            licensePlate: detail.licensePlate || '',
+            chassisNumber: detail.engineID || '',
+            color: detail.carColor || '',
+            insuranceCoverage: detail.insuranceBalance || 0,
           },
-          incidentDate: detail?.incidentDate || rawClaim?.incidentDate || '',
-          location: detail?.location || rawClaim?.location || '',
-          description: detail?.detail || rawClaim?.detail || '',
-          reportedDate: detail?.reportedDate || rawClaim?.reportedDate || '',
-          assignedOfficer: detail?.assignedOfficer?.name || '',
-          assignedDate: '', // ไม่มีใน route ปัจจุบัน
+          incidentDate: detail.incidentDate || '',
+          location: detail.location || '',
+          description: detail.detail || '',
+
+          // (คำสั่ง 2: assignedOfficer)
+          assignedOfficer: detail.assignedOfficer?.name || 'N/A',
+          // (คำสั่ง 3: assignedDate)
+          assignedDate: detail.assignedDate || '', // (Map มาจาก reportedDate)
           report: null,
         };
         setClaim(claimForUI);
 
-        // ตั้งค่าเริ่มต้นของแบบฟอร์มจาก claim.detail + reportedDate (ถ้ามี)
-        const initialDamageDesc = rawClaim?.detail || detail?.detail || '';
-        // reportedDate เป็น "yyyy-mm-dd hh:mm" → แยกเป็น date/time
-        let initialDate = new Date();
+        // 2) (แก้ไข) ตั้งค่าเริ่มต้นของแบบฟอร์ม
+        const initialDamageDesc = rawClaim.detail || '';
+
+        let initialDate = new Date().toISOString().split('T')[0];
         let initialTime = new Date().toTimeString().slice(0, 5);
 
-        // ⭐️ (แก้ไข) ใช้ inspectionDate ถ้ามี, ถ้าไม่มีใช้ reportedDate
-        const dateToUse = rawClaim?.inspectionDate || rawClaim?.reportedDate || detail?.reportedDate;
 
-        if (dateToUse && typeof dateToUse === 'string' && dateToUse.includes(' ')) {
-          const [d, t] = dateToUse.split(' ');
-          initialDate = d;
-          initialTime = t?.slice(0, 5) || initialTime;
-        }
 
         setReportData(prev => ({
           ...prev,
-          inspectionDate: typeof initialDate === 'string'
-              ? initialDate
-              : new Date(initialDate).toISOString().split('T')[0],
+          inspectionDate: initialDate,
           inspectionTime: initialTime,
           damageDescription: initialDamageDesc,
           repairItems: [
-            // โหลดรายการจาก DB ให้แก้/ลบได้
+            // (คำสั่ง 5: โหลดรายการจาก DB)
             ...rawItems.map(x => ({
-              id: x._id,           // ใช้ _id ให้ unique
-              _id: x._id,          // เก็บไว้สำหรับลบ DB
+              id: x.id,
+              _id: x._id,
               existing: true,
-              type: x.type || '',
-              customDescription: '', // จาก DB ไม่มี แสดงเป็นค่าว่าง
+              type: x.type || '', // (Type ที่เรา map มา)
+              customDescription: x.customDescription || '', // (customDesc ที่เรา map มา)
               cost: x.cost ?? '',
             })),
           ],
         }));
 
-        // รวมรูปจาก DB (existing) เข้า state images (เพื่อให้ UI เห็นเหมือนเดิม)
+        // 3) (แก้ไข) รวมรูปจาก DB
         const existingImages = rawPhotos.map(p => ({
-          id: p._id, // <--- ✅ FIX (แก้ปัญหาลบทั้งหมด)
+          id: p.id,
           _id: p._id,
           existing: true,
-          preview: p.photoURL, // <--- ✅ FIX (แก้ปัญหาไม่แสดง)
+          preview: p.photoURL,
           type: p.type || 'damage',
           caption: p.caption || '',
-          file: null // ⭐️ รูปที่มาจาก DB จะไม่มี File object
+          file: null
         }));
         setImages(existingImages);
+
       } catch (err) {
         console.error('Load Claim failed:', err);
       } finally {
@@ -219,7 +213,6 @@ const ClaimDetail = () => {
     setImages(prev => [...prev, ...newImageEntries]);
     if (errors.images) setErrors(prev => ({ ...prev, images: '' }));
 
-    // 2. (FIX) ❌ ลบการอัปโหลดไป /upload-temp ทิ้ง
   };
 
   // (โค้ดนี้คือเวอร์ชันที่แก้ "ลบทั้งหมด" แล้ว)
@@ -266,6 +259,31 @@ const ClaimDetail = () => {
   };
 
   const handleRepairItemChange = (itemId, field, value) => {
+
+    // ⭐️ 1. เพิ่ม Logic Validation สำหรับช่อง 'cost'
+    if (field === 'cost') {
+
+      // 1.1 ไม่อนุญาตให้กรอก 'e', 'E', '+', '-'
+      if (['e', 'E', '+', '-'].some(char => value.includes(char))) {
+        return; // ไม่ต้องอัปเดต State
+      }
+
+      // 1.2 แปลงเป็นตัวเลข
+      const num = parseFloat(value);
+
+      // 1.3 ถ้าค่าเกิน 100,000
+      if (num > 100000) {
+        alert("ไม่สามารถกรอกค่าซ่อมเกิน 100,000 บาท");
+        value = "100000"; // (บังคับค่าสูงสุด)
+      }
+
+      // 1.4 (เผื่อไว้) ถ้าค่าน้อยกว่า 0
+      if (num < 0) {
+        value = "0";
+      }
+    }
+
+    // ⭐️ 2. (โค้ดเดิม) อัปเดต State
     setReportData(prev => ({
       ...prev,
       repairItems: prev.repairItems.map(item =>
@@ -346,6 +364,10 @@ const ClaimDetail = () => {
           type: x.type,
           cost: Number(x.cost) || 0,
           customDescription: x.customDescription || '',
+
+          // ⭐️⭐️⭐️ (เพิ่ม 2 บรรทัดนี้) ⭐️⭐️⭐️
+          existing: x.existing, // 1. ส่ง Flag 'existing'
+          frontendId: x.id      // 2. ส่ง ID ที่ Frontend ใช้ (ไม่ว่าจะเป็น temp หรือ dbId)
         }))
     ));
 
@@ -504,9 +526,7 @@ const ClaimDetail = () => {
             </button>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-neutral-dark">{claim.claimNumber}</h1>
-              <span className={`badge badge-sm ${claim.priority === 'urgent' ? 'badge-error' : claim.priority === 'high' ? 'badge-warning' : 'badge-neutral'}`}>
-              {claim.priority === 'urgent' ? 'ด่วนมาก' : claim.priority === 'high' ? 'ด่วน' : 'ปกติ'}
-            </span>
+
             </div>
             <div className="flex items-center gap-3">
               <p className="text-neutral-500">อัปโหลดรายงานจากการตรวจสอบพื้นที่</p>
@@ -576,10 +596,9 @@ const ClaimDetail = () => {
                   accept="image/*"
                   multiple
                   files={images}
-                  onChange={handleImagesChange}   // (สำหรับเพิ่มไฟล์ใหม่)
-                  onRemove={handleRemoveImage}   // (สำหรับลบ)
-                  onUpdateFiles={handleUpdateImages} // (สำหรับแก้ Caption/Type)
+                  onUpdateFiles={setImages}
                   error={errors.images}
+                  claimId={claim.id} // ⬅️ ⭐️ ต้องส่ง ID ของเคสไปด้วย
               />
             </div>
 
@@ -600,6 +619,7 @@ const ClaimDetail = () => {
                       onChange={handleChange}
                       icon="calendar_today"
                       required
+                      disabled
                   />
 
                   <Input
@@ -610,6 +630,7 @@ const ClaimDetail = () => {
                       onChange={handleChange}
                       icon="schedule"
                       required
+                      disabled
                   />
                 </div>
 
@@ -693,6 +714,10 @@ const ClaimDetail = () => {
                                   type="number"
                                   placeholder="0"
                                   value={item.cost}
+                                  min="0" // ⭐️ 1. ป้องกันค่าติดลบ
+                                  step="any" // ⭐️ 2. อนุญาตทศนิยม
+                                  // ⭐️ 3. ดักจับการพิมพ์ 'e', '+', '-'
+                                  onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                                   onChange={(e) => handleRepairItemChange(item.id, 'cost', e.target.value)}
                                   className="input-field"
                               />

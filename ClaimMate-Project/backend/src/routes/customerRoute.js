@@ -31,7 +31,7 @@ router.get('/search/by-idcard/:citizenId', async (req, res) => {
                 {
                     model: Policy,
                     // ✅ [แก้ไข 1] เพิ่ม 'balance' เข้าไปใน attributes ที่ดึงมา
-                    attributes: ['policyNumber', 'level', 'startDate', 'endDate', 'balance'],
+                    attributes: ['policyNumber', 'level', 'startDate', 'endDate', 'remainingBalance'],
                 }
             ]
         });
@@ -63,7 +63,7 @@ router.get('/search/by-idcard/:citizenId', async (req, res) => {
                     insuranceExpireAt: policy.endDate || '-',
 
                     // ✅ [แก้ไข 3] ส่ง 'balance' จาก Policy ออกไป
-                    balance: policy.balance || 0,
+                    balance: policy.remainingBalance || 0,
 
                     isPrimary: false,
                 }
