@@ -26,7 +26,7 @@ const InsuranceSidebar = ({ collapsed = false }) => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await axios.get('http://localhost:3000/api/claims/stats/summary');
+                const res = await axios.get('http://localhost:3000/api/claims/stats');
                 setStats(res.data);
             } catch (err) {
                 console.error('Error fetching stats:', err);
