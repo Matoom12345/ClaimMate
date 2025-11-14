@@ -630,20 +630,19 @@ router.post('/photos/upload/:id', upload.single('photo'), async (req, res) => {
  * @access  Private (Insurance)
  */
 router.get('/history', async (req, res) => {
-    // ⭐️ (1. ลบ) insuranceID logic ⭐️
-    // const { insuranceID } = req.query;
-    // if (!insuranceID) {
-    //     return res.status(400).json({ message: 'insuranceID is required' });
-    // }
-
     try {
         const closedClaims = await Claim.findAll({
-            // ⭐️ (2. ลบ) where filter ⭐️
-            // where: { insuranceId: insuranceID },
+            // ⭐️ (1. เลือก Fields ที่ต้องการจาก Claim)
+            attributes: [
+                'id',
+                'incidentDate', // ⬅️ (UI ต้องการ)
+                'estimateCost', // ⬅️ (เผื่อ approvedCost เป็น null)
+                'approvedCost'  // ⬅️ (UI ต้องการ)
+            ],
             include: [
                 {
                     model: ClaimStatus,
-                    where: { isClosed: true }, // ⭐️ Key filter: เฉพาะเคสที่ปิดแล้ว
+                    where: { isClosed: true },
                     required: true
                 },
                 {
@@ -651,33 +650,62 @@ router.get('/history', async (req, res) => {
                     include: [{ model: User, attributes: ['firstName', 'lastName'] }]
                 },
                 {
+                    // ⭐️ (2. แก้ไข Car)
                     model: Car,
-                    attributes: ['licensePlate']
+                    attributes: [
+                        'licensePlate', // (UI ต้องการ)
+                        'model'         // ⬅️ (UI ต้องการ)
+                    ]
                 },
                 {
-                    model: Satisfaction, // ⭐️ Join Satisfaction
-                    required: false // ⭐️ ใช้ LEFT JOIN (เผื่อเคสที่ยังไม่มีรีวิว)
+                    model: Satisfaction,
+                    required: false
+                },
+                {
+                    // ⭐️ (3. เพิ่ม Insurance -> User)
+                    model: Insurance,
+                    attributes: ['id'],
+                    include: [{
+                        model: User,
+                        attributes: ['firstName', 'lastName'] // ⬅️ (UI ต้องการ)
+                    }]
                 }
             ],
-            // ⭐️ (2. แก้ไข Syntax การ Order - เอา {} ออก) ⭐️
-            order: [[ClaimStatus, 'completedDate', 'DESC']] // เรียงจากวันที่เสร็จล่าสุด
+            order: [[ClaimStatus, 'completedDate', 'DESC']]
         });
 
-        // Map ข้อมูลให้ตรงกับ Mockup ของ Frontend
+        // ⭐️ (4. Map ข้อมูลให้ตรงกับ Mockup ของ Frontend)
         const formattedHistory = closedClaims.map(claim => {
             const customerUser = claim.Customer?.User || {};
             const car = claim.Car || {};
             const status = claim.ClaimStatus || {};
-            const satisfaction = claim.Satisfaction || {}; // ดึงข้อมูล Satisfaction
+            const satisfaction = claim.Satisfaction || {};
+            const officerUser = claim.Insurance?.User || {}; // ⬅️ ดึง Officer
+
+            // ⬅️ (UI ต้องการชื่อ Officer)
+            const assignedOfficerName = `${officerUser.firstName || ''} ${officerUser.lastName || ''}`.trim() || 'N/A';
 
             return {
                 id: claim.id,
                 claimNumber: `CLM-${claim.id}`,
                 customerName: `${customerUser.firstName || ''} ${customerUser.lastName || ''}`.trim(),
                 licensePlate: car.licensePlate || '',
-                completedDate: status.completedDate || status.updatedAt, // ใช้วันที่เสร็จสิ้น
-                totalCost: claim.estimateCost || 0, // (ดึงจาก estimateCost ที่เราบันทึกไว้)
-                rating: satisfaction.rating || null // ⭐️ ดึงคะแนน Rating
+
+                // --- Fields ที่แก้ไข/เพิ่ม ---
+                carModel: car.model || '', // ⬅️ (เพิ่ม)
+                incidentDate: claim.incidentDate, // ⬅️ (เพิ่ม)
+                completedDate: status.completedDate || status.updatedAt,
+
+                // ⬅️ (แก้ไข) ใช้ approvedCost ถ้ามี, ถ้าไม่มีใช้ estimateCost
+                approvedAmount: claim.approvedCost || claim.estimateCost || 0,
+
+                // ⬅️ (แก้ไข) เปลี่ยนชื่อ field เป็น satisfaction
+                satisfaction: satisfaction.rating || 0, // (ใช้ 0 ถ้าเป็น null)
+
+                assignedOfficer: assignedOfficerName, // ⬅️ (เพิ่ม)
+
+                // (Field `estimatedCost` จาก mockup ไม่มีในตาราง แต่เราใช้ approvedAmount แทน)
+                estimatedCost: claim.estimateCost || 0
             };
         });
 

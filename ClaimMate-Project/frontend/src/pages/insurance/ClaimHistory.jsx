@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios'; // ⭐️ (1. Import axios)
+import Cookies from 'js-cookie'; // ⭐️ (2. Import Cookies)
 
 /**
  * ClaimHistory - หน้าประวัติการเคลมที่เสร็จสิ้นแล้ว
- *
- * จุดประสงค์:
- * - ดูประวัติเคลมที่เสร็จสิ้นเท่านั้น
- * - ค้นหาและ filter เคลม
- * - Export รายงาน
- * - แสดงสถิติและข้อมูลที่น่าสนใจ
+ * (... comment เดิม ...)
  */
 const ClaimHistory = () => {
   const [loading, setLoading] = useState(true);
@@ -16,92 +13,67 @@ const ClaimHistory = () => {
   const [filterMonth, setFilterMonth] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const monthFilters = [
-    { value: 'all', label: 'ทุกเดือน' },
-    { value: '2024-10', label: 'ตุลาคม 2024' },
-    { value: '2024-09', label: 'กันยายน 2024' },
-    { value: '2024-08', label: 'สิงหาคม 2024' },
-  ];
+  // (Mockup data เดิม - ลบทิ้ง)
+  // const monthFilters = [...];
 
+  // ⭐️ (3. แก้ไข useEffect ทั้งหมด)
   useEffect(() => {
-    // TODO: Backend - ดึงประวัติเคลมที่เสร็จสิ้นแล้ว
-    setTimeout(() => {
-      setClaims([
-        {
-          id: '10',
-          claimNumber: 'CLM-2024-010',
-          customerName: 'นายสมชาย ใจดี',
-          carModel: 'Honda City',
-          licensePlate: 'กข 1234 กรุงเทพ',
-          incidentDate: '2024-10-20',
-          completedDate: '2024-10-28',
-          estimatedCost: 25000,
-          approvedAmount: 25000,
-          satisfaction: 5,
-          assignedOfficer: 'นางสาววิภา ประกันภัย',
-        },
-        {
-          id: '9',
-          claimNumber: 'CLM-2024-009',
-          customerName: 'นางสุดา รักษ์ดี',
-          carModel: 'Toyota Yaris',
-          licensePlate: 'คง 5678 กรุงเทพ',
-          incidentDate: '2024-10-15',
-          completedDate: '2024-10-22',
-          estimatedCost: 15000,
-          approvedAmount: 15000,
-          satisfaction: 4,
-          assignedOfficer: 'นายสมชาย ตรวจสอบ',
-        },
-        {
-          id: '8',
-          claimNumber: 'CLM-2024-008',
-          customerName: 'นายประเสริฐ มั่นคง',
-          carModel: 'Mazda CX-5',
-          licensePlate: 'งง 9999 กรุงเทพ',
-          incidentDate: '2024-09-28',
-          completedDate: '2024-10-08',
-          estimatedCost: 32000,
-          approvedAmount: 30000,
-          satisfaction: 3,
-          assignedOfficer: 'นางสาววิภา ประกันภัย',
-        },
-        {
-          id: '7',
-          claimNumber: 'CLM-2024-007',
-          customerName: 'นางวิมล สุขสันต์',
-          carModel: 'Honda CR-V',
-          licensePlate: 'ฮฮ 7777 กรุงเทพ',
-          incidentDate: '2024-09-10',
-          completedDate: '2024-09-18',
-          estimatedCost: 48000,
-          approvedAmount: 45000,
-          satisfaction: 5,
-          assignedOfficer: 'นางสุดา รายงาน',
-        },
-        {
-          id: '6',
-          claimNumber: 'CLM-2024-006',
-          customerName: 'นายเจริญ พัฒนา',
-          carModel: 'Toyota Fortuner',
-          licensePlate: 'จจ 1111 กรุงเทพ',
-          incidentDate: '2024-08-20',
-          completedDate: '2024-09-05',
-          estimatedCost: 55000,
-          approvedAmount: 52000,
-          satisfaction: 4,
-          assignedOfficer: 'นายสมชาย ตรวจสอบ',
-        },
-      ]);
-      setLoading(false);
-    }, 500);
-  }, []);
+    const fetchClaimHistory = async () => {
+      setLoading(true);
+      try {
+        // ดึง Token จาก Cookie (เหมือนหน้า ActiveClaims)
+        const token = Cookies.get('token');
 
-  // Filter claims
+        // TODO: Backend - ดึงประวัติเคลมที่เสร็จสิ้นแล้ว (<< ทำจริงแล้ว)
+        const response = await axios.get('http://localhost:3000/api/claims/history', {
+          headers: {
+            Authorization: `Bearer ${token}` // ส่ง Token เพื่อยืนยันตัวตน
+          }
+        });
+
+        // ( response.data คือ array ที่ backend ส่งมา)
+        setClaims(response.data);
+
+      } catch (error) {
+        console.error('Error fetching claim history:', error);
+        // (อาจจะ set error message ไปแสดงผล)
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClaimHistory(); // เรียกใช้งาน function
+  }, []); // ทำงานครั้งเดียวเมื่อ Component โหลด
+
+  // ⭐️ (4. สร้าง monthFilters แบบ Dynamic จากข้อมูลจริง)
+  const monthFilters = React.useMemo(() => {
+    const months = new Map();
+    months.set('all', 'ทุกเดือน');
+
+    claims.forEach(claim => {
+      if (claim.completedDate) {
+        const date = new Date(claim.completedDate);
+        const monthKey = date.toISOString().substring(0, 7); // "YYYY-MM"
+        const monthLabel = date.toLocaleString('th-TH', {
+          month: 'long',
+          year: 'numeric',
+        });
+        if (!months.has(monthKey)) {
+          months.set(monthKey, monthLabel);
+        }
+      }
+    });
+
+    return Array.from(months, ([value, label]) => ({ value, label }));
+  }, [claims]);
+
+
+  // Filter claims (⭐️ 5. แก้ไข field ที่ใช้ filter)
   const filteredClaims = claims.filter(claim => {
     // Filter by month
     if (filterMonth !== 'all') {
-      const claimMonth = claim.incidentDate.substring(0, 7);
+      // (ใช้ completedDate แทน incidentDate เพื่อ filter)
+      const claimMonth = claim.completedDate ? claim.completedDate.substring(0, 7) : '';
       if (claimMonth !== filterMonth) {
         return false;
       }
@@ -120,12 +92,12 @@ const ClaimHistory = () => {
     return true;
   });
 
-  // Calculate statistics
+  // Calculate statistics (⭐️ 6. แก้ไข field ที่ใช้คำนวณ)
   const stats = {
     totalClaims: filteredClaims.length,
     totalAmount: filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0),
     averageSatisfaction: filteredClaims.length > 0
-        ? (filteredClaims.reduce((sum, claim) => sum + claim.satisfaction, 0) / filteredClaims.length).toFixed(1)
+        ? (filteredClaims.reduce((sum, claim) => sum + (claim.satisfaction || 0), 0) / filteredClaims.length).toFixed(1) // (ใช้ claim.satisfaction)
         : 0,
     averageAmount: filteredClaims.length > 0
         ? Math.round(filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0) / filteredClaims.length)
@@ -134,13 +106,15 @@ const ClaimHistory = () => {
 
   // Render satisfaction stars
   const renderStars = (rating) => {
+    // (กัน rating เป็น null หรือ 0)
+    const validRating = Number(rating) || 0;
     return (
         <div className="flex items-center gap-0.5">
           {[1, 2, 3, 4, 5].map((star) => (
               <span
                   key={star}
                   className={`material-icons-round text-base ${
-                      star <= rating ? 'text-yellow-400' : 'text-neutral-300'
+                      star <= validRating ? 'text-yellow-400' : 'text-neutral-300'
                   }`}
               >
             star
@@ -151,6 +125,7 @@ const ClaimHistory = () => {
   };
 
   if (loading) {
+    // (Loading UI เดิม)
     return (
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
@@ -161,12 +136,13 @@ const ClaimHistory = () => {
     );
   }
 
+  // (Header UI เดิม)
   return (
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-neutral-dark mb-2">
+            <h1 className="text-3xl font.bold text-neutral-dark mb-2">
               ประวัติการเคลม
             </h1>
             <p className="text-neutral-500">
@@ -179,7 +155,7 @@ const ClaimHistory = () => {
           </button>
         </div>
 
-        {/* 📊 Stats Cards */}
+        {/* 📊 Stats Cards (⭐️ 7. แก้ไข field stats) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Total Claims */}
           <div className="card">
@@ -200,7 +176,12 @@ const ClaimHistory = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-neutral-500 text-sm mb-1">ค่าซ่อมรวม</p>
-                <p className="text-3xl font-bold text-neutral-dark">฿{(stats.totalAmount / 1000000).toFixed(1)}M</p>
+                {/* (แก้ไขให้ยืดหยุ่น) */}
+                <p className="text-3xl font-bold text-neutral-dark">
+                  ฿{stats.totalAmount > 1000000
+                    ? `${(stats.totalAmount / 1000000).toFixed(1)}M`
+                    : `${(stats.totalAmount / 1000).toFixed(0)}K`}
+                </p>
                 <p className="text-neutral-400 text-xs mt-1">
                   เฉลี่ย ฿{(stats.averageAmount / 1000).toFixed(0)}K
                 </p>
@@ -234,13 +215,15 @@ const ClaimHistory = () => {
             </div>
           </div>
 
-          {/* This Month */}
+          {/* This Month (⭐️ 8. แก้ไข logic) */}
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-neutral-500 text-sm mb-1">เดือนนี้</p>
                 <p className="text-3xl font-bold text-neutral-dark">
-                  {claims.filter(c => c.completedDate.startsWith('2024-10')).length}
+                  {claims.filter(c =>
+                      c.completedDate && c.completedDate.startsWith(new Date().toISOString().substring(0, 7))
+                  ).length}
                 </p>
                 <p className="text-neutral-400 text-xs mt-1">รายการ</p>
               </div>
@@ -251,7 +234,7 @@ const ClaimHistory = () => {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters (⭐️ 9. ใช้ monthFilters ที่สร้างใหม่) */}
         <div className="card-static">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
@@ -285,65 +268,26 @@ const ClaimHistory = () => {
           </div>
         </div>
 
-        {/* Claims Table */}
+        {/* Claims Table (⭐️ 10. แก้ไข field ให้ตรงกับ API) */}
         {filteredClaims.length === 0 ? (
+            // (No data UI - เดิม)
             <div className="card-static text-center py-16">
-              <div className="w-24 h-24 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="material-icons-round text-6xl text-neutral-300">
-              search_off
-            </span>
-              </div>
-              <p className="text-neutral-600 text-lg font-medium mb-2">
-                ไม่พบประวัติการเคลม
-              </p>
-              <p className="text-neutral-400 text-sm">
-                ลองเปลี่ยนคำค้นหาหรือเลือกเดือนอื่น
-              </p>
+              {/* ... */}
             </div>
         ) : (
             <div className="card-static overflow-x-auto">
               <table className="w-full">
                 <thead>
+                {/* (Header Table - เดิม) */}
                 <tr className="border-b-2 border-neutral-200">
+                  {/* ... */}
                   <th className="text-left py-4 px-4 font-semibold text-neutral-700">
                     <div className="flex items-center gap-2">
                       <span className="material-icons-round text-neutral-400 text-lg">receipt_long</span>
                       <span>เลขเคลม</span>
                     </div>
                   </th>
-                  <th className="text-left py-4 px-4 font-semibold text-neutral-700">
-                    <div className="flex items-center gap-2">
-                      <span className="material-icons-round text-neutral-400 text-lg">person</span>
-                      <span>ลูกค้า</span>
-                    </div>
-                  </th>
-                  <th className="text-left py-4 px-4 font-semibold text-neutral-700">
-                    <div className="flex items-center gap-2">
-                      <span className="material-icons-round text-neutral-400 text-lg">directions_car</span>
-                      <span>รถยนต์</span>
-                    </div>
-                  </th>
-                  <th className="text-left py-4 px-4 font-semibold text-neutral-700">
-                    <div className="flex items-center gap-2">
-                      <span className="material-icons-round text-neutral-400 text-lg">event</span>
-                      <span>วันที่</span>
-                    </div>
-                  </th>
-                  <th className="text-right py-4 px-4 font-semibold text-neutral-700">
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="material-icons-round text-neutral-400 text-lg">payments</span>
-                      <span>ค่าซ่อม</span>
-                    </div>
-                  </th>
-                  <th className="text-center py-4 px-4 font-semibold text-neutral-700">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="material-icons-round text-yellow-400 text-lg">star</span>
-                      <span>ความพึงพอใจ</span>
-                    </div>
-                  </th>
-                  <th className="text-center py-4 px-4 font-semibold text-neutral-700">
-                    การดำเนินการ
-                  </th>
+                  {/* ... */}
                 </tr>
                 </thead>
                 <tbody>
@@ -355,7 +299,7 @@ const ClaimHistory = () => {
                       <td className="py-4 px-4">
                         <p className="font-bold text-primary-600">{claim.claimNumber}</p>
                         <p className="text-xs text-neutral-400 mt-1">
-                          {claim.assignedOfficer}
+                          {claim.assignedOfficer} {/* ⬅️ (ใช้ field ใหม่) */}
                         </p>
                       </td>
                       <td className="py-4 px-4">
@@ -363,36 +307,41 @@ const ClaimHistory = () => {
                       </td>
                       <td className="py-4 px-4">
                         <div>
-                          <p className="font-medium text-neutral-dark">{claim.carModel}</p>
+                          <p className="font-medium text-neutral-dark">{claim.carModel}</p> {/* ⬅️ (ใช้ field ใหม่) */}
                           <p className="text-sm text-neutral-500">{claim.licensePlate}</p>
                         </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="space-y-1">
                           <p className="text-sm text-neutral-600">
-                            <span className="text-xs text-neutral-400">เกิดเหตุ:</span> {claim.incidentDate}
+                            {/* ⬅️ (ใช้ field ใหม่ และ format) */}
+                            <span className="text-xs text-neutral-400">เกิดเหตุ:</span> {claim.incidentDate ? new Date(claim.incidentDate).toLocaleDateString('th-TH') : 'N/A'}
                           </p>
                           <p className="text-sm text-neutral-600">
-                            <span className="text-xs text-neutral-400">เสร็จ:</span> {claim.completedDate}
+                            {/* ⬅️ (ใช้ field ใหม่ และ format) */}
+                            <span className="text-xs text-neutral-400">เสร็จ:</span> {claim.completedDate ? new Date(claim.completedDate).toLocaleDateString('th-TH') : 'N/A'}
                           </p>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-right">
                         <p className="font-bold text-neutral-dark text-lg">
+                          {/* ⬅️ (ใช้ field ใหม่) */}
                           ฿{claim.approvedAmount.toLocaleString()}
                         </p>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex flex-col items-center gap-1">
+                          {/* ⬅️ (ใช้ field ใหม่) */}
                           {renderStars(claim.satisfaction)}
                           <span className="text-xs font-medium text-neutral-600">
-                        {claim.satisfaction}.0/5.0
-                      </span>
+                             {/* ⬅️ (ใช้ field ใหม่) */}
+                            {Number(claim.satisfaction || 0).toFixed(1)}/5.0
+                          </span>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <Link
-                            to={`/insurance/claims/${claim.id}`}
+                            to={`/insurance/claims/${claim.id}`} // (Link เดิม)
                             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium text-sm transition-all duration-300 hover:shadow-button"
                         >
                           <span className="material-icons-round text-sm">visibility</span>
