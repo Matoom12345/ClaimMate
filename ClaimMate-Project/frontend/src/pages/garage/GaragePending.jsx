@@ -30,7 +30,7 @@ const GaragePending = () => {
 
       // **สำคัญ**: แก้ Port เป็น 3000 (ตามไฟล์ backend/server.js ของคุณ)
       const response = await axios.get(
-        'http://localhost:3000/api/garage/pending-requests', // <-- แก้ไข Port
+        'http://localhost:3000/api/garages/pending-requests', // <-- แก้ไข Port
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -65,7 +65,7 @@ const GaragePending = () => {
       // ยิง API ไปที่ Backend (ที่เราสร้างในส่วนที่ 1)
       // selectedClaim.id คือ ID ของ ChooseGarageRequest
       await axios.post(
-        `http://localhost:3000/api/garage/requests/${selectedClaim.id}/accept`,
+        `http://localhost:3000/api/garages/requests/${selectedClaim.id}/accept`,
         {}, // body ว่าง
         {
           headers: {
@@ -102,7 +102,7 @@ const GaragePending = () => {
 
       // ยิง API ไปที่ Backend (ที่เราสร้างในส่วนที่ 1)
       await axios.post(
-        `http://localhost:3000/api/garage/requests/${selectedClaim.id}/reject`,
+        `http://localhost:3000/api/garages/requests/${selectedClaim.id}/reject`,
         {}, // body ว่าง
         {
           headers: {
@@ -204,7 +204,7 @@ const GaragePending = () => {
               <CardBody className="flex-grow">
                 {/* ใช้ Optional Chaining (?) ป้องกัน error ถ้าข้อมูลไม่มี */}
                 <p>
-                  <strong>เลขทะเบียน:</strong> {job.Claim?.Car?.plateNumber || 'N/A'}
+                  <strong>เลขทะเบียน:</strong> {job.Claim?.Car?.licensePlate || 'N/A'}
                 </p>
                 <p>
                   <strong>ลูกค้า:</strong> {job.Claim?.Customer?.User?.firstName || ''}{' '}

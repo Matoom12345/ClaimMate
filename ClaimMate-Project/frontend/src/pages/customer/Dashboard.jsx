@@ -86,22 +86,6 @@ const CustomerDashboard = () => {
         }
     };
 
-    const getPriorityBadge = (priority) => {
-        const config = {
-            urgent: { label: 'ด่วนมาก', color: 'error', icon: 'priority_high' },
-            high: { label: 'ด่วน', color: 'warning', icon: 'arrow_upward' },
-            normal: { label: 'ปกติ', color: 'neutral', icon: 'remove' },
-        };
-        const { label, color, icon } = config[priority] || config.normal;
-
-        return (
-            <span className={`badge badge-${color} badge-sm flex items-center gap-1`}>
-        <span className="material-icons-round text-xs">{icon}</span>
-                {label}
-      </span>
-        );
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">

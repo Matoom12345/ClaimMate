@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ClaimTimeline, StatusBadge, Modal } from "../../components";
 
 const ClaimDetail = () => {
   const { id } = useParams(); // ✅ id = claimNumber
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [claim, setClaim] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -14,41 +15,11 @@ const ClaimDetail = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [repairItems, setRepairItems] = useState([]);
 
-  // ✅ Priority Badge Helper (ข้อ 1: แสดง priority แทน title)
-  const getPriorityBadge = (priority) => {
-    const config = {
-      urgent: { label: 'ด่วนมาก', color: 'error', icon: 'priority_high' },
-      high: { label: 'ด่วน', color: 'warning', icon: 'arrow_upward' },
-      normal: { label: 'ปกติ', color: 'neutral', icon: 'remove' },
-    };
-    const { label, color, icon } = config[priority] || config.normal;
-
-    return (
-      <span className={`badge badge-${color} badge-sm flex items-center gap-1`}>
-        <span className="material-icons-round text-xs">{icon}</span>
-        {label}
-      </span>
-    );
-  };
-
   useEffect(() => {
     loadClaimData();
   }, [id]);
 
   // ⭐️ (เพิ่ม) Function สำหรับแปลง DB State เป็น UI Step (ที่ Timeline/GarageDisplay คาดหวัง)
-  const mapStateToStep = (state) => {
-    const mapping = {
-      'open_case': 'reported',        // Maps to reportedDate
-      'survey': 'inspected',        // Maps to inspectionDate
-      'approved': 'approved',         // Maps to approvalDate
-      'garage_selected': 'garage_selected', // Maps to garageSelectedDate
-      'repair': 'repair',             // Maps to repairStartDate (ต้องเช็คชื่อใน Component Timeline)
-      'completed': 'completed'        // Maps to completedDate
-    };
-    // ⭐️ (ปรับ) ถ้า ClaimTimeline ของคุณใช้ key 'repair_in_progress' ให้แก้ตรงนี้
-    if (state === 'repair') return 'repair';
-    return mapping[state] || 'reported'; // Default
-  };
 
 
   const loadClaimData = async () => {
@@ -91,8 +62,8 @@ const ClaimDetail = () => {
           name: c.garageName,
           phone: c.garagePhone,
           email: c.garageEmail,
-          address: "-",
-          distance: "-",
+          address: c.garageAddress,
+          googleMapsUrl: c.googleMapsUrl
         }
         : null;
 
@@ -136,7 +107,6 @@ const ClaimDetail = () => {
       const extraCost = Math.max(0, totalRepairCost - insuranceCoverage);
 
       // ⭐️ 7. (แก้ไข) Map state 'survey' (DB) ไปเป็น 'inspected' (UI)
-      const uiStep = mapStateToStep(c.state);
 
       // ⭐️ 8. (แก้ไข) กำหนดว่า 'เกินงบ' หรือไม่
       // (จะแสดงปุ่มใน Sidebar ต่อเมื่อ state เป็น 'survey' และมี 'extraCost')
@@ -148,8 +118,7 @@ const ClaimDetail = () => {
         detail: c.detail,
         location: c.location,
         status: c.state, // ⭐️ DB State (e.g., 'survey')
-        currentStep: uiStep, // ⭐️ UI Step String (e.g., 'inspected')
-        priority: rawClaim.priorityLevel || 'normal',
+        currentStep: c.currentStep, 
 
         incidentDate: c.incidentDate,
         estimatedCost: c.estimatedCost || 0,
@@ -189,9 +158,12 @@ const ClaimDetail = () => {
 
   // ✅ ข้อ 2: ตรวจสอบว่าควรแสดงอะไรในส่วนอู่ซ่อม
   const getGarageDisplay = () => {
+    console.log('Inspecting claim object:', claim);
+    if (!claim) return null;
 
     // ⭐️ (1) ดึง currentStep (ตัวเลข) ออกมาจาก ClaimStatus
-    const step = claim?.ClaimStatus?.currentStep;
+    const step = claim.currentStep;
+    const garage = claim.garage;
 
     // (ถ้ายังไม่มีข้อมูล claim หรือ step ก็ไม่ต้องแสดงอะไรเลย)
     if (!step) {
@@ -206,15 +178,15 @@ const ClaimDetail = () => {
 
     // ⭐️ (3) ขั้นตอนที่ 3 (approved) หรือ 4 (choose_garage)
     //    และ ยังไม่มีอู่ (claim.Garage เป็น null)
-    if ((step === 3 || step === 4) && !claim.Garage) {
-      return { show: true, type: 'action', message: 'เลือกอู่ซ่อม' };
+    if ((step === 3 || step === 4) && !garage) {
+      return { show: true, type: 'action'};
     }
 
     // ถ้ามีอู่แล้ว (Join มาเจอ) ให้แสดงข้อมูลอู่
     // (จะเกิดขึ้นใน step 4 (หลังเลือก) หรือ 5 (repair))
-    if (claim.Garage) {
+    if (garage) {
       // ⭐️ (4) แก้ไข: ให้ส่งข้อมูลจาก claim.Garage (ที่เรา Join มา)
-      return { show: true, type: 'info', garage: claim.Garage };
+      return { show: true, type: 'info', garage: garage };
     }
 
     // default (กรณีอื่นๆ ที่ไม่เข้าเงื่อนไข)
@@ -433,6 +405,7 @@ const ClaimDetail = () => {
               </div>
             </div>
           </div>
+
           {/* ⭐️ ✅ ข้อ 4: รูปภาพความเสียหายและเอกสารประกอบ (ดึงจาก State 'claim.images') */}
           <div className="card-static">
             <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
@@ -695,7 +668,7 @@ const ClaimDetail = () => {
                       <p className="text-sm text-neutral-500 mb-1">เบอร์โทร</p>
                       <a
                         // ⭐️ (7) (ต้องเช็ค Model) สมมติว่าใน Garage Model มี 'phoneNumber'
-                        href={`tel:${garageDisplay.garage.phoneNumber || ''}`}
+                        href={`tel:${garageDisplay.garage.phone || ''}`}
                         className="text-primary-600 hover:text-primary-700 font-medium"
                       >
                         {garageDisplay.garage.phoneNumber || 'N/A'}
@@ -768,7 +741,7 @@ const ClaimDetail = () => {
 
             <div className="space-y-2">
               {/* ✅ (8) แก้ไข: ปุ่มเลือกอู่ซ่อม (แสดงเมื่อ step 3 หรือ 4 และยังไม่มีอู่) */}
-              {(claim?.ClaimStatus?.currentStep === 3 || claim?.ClaimStatus?.currentStep === 4) && !claim.Garage && (
+              {(claim.currentStep === 3 || claim.currentStep === 4) && !claim.garage && (
                 <Link
                   // ⭐️ (9) แก้ไข: Link ควรอ้างอิงด้วย claim.id (PK)
                   to={`/customer/select-garage/${claim.id}`}

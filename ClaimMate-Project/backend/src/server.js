@@ -29,7 +29,7 @@ const garageRoute = require('./routes/garageRoute');
 app.use('/api/auth', authRoute);
 app.use('/api/customers', customerRoute); // 1. ใช้งาน customerRoute
 app.use('/api/claims', claimRoute);       // 2. ใช้งาน claimRoute
-app.use('/api/garage', garageRoute);
+app.use('/api/garages', garageRoute);
 
 // --- Database Connection ---
 db.sequelize.authenticate()

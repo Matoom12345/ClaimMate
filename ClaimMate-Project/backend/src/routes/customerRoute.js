@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Customer, User, Car, Policy } = require('../models');
+const { Customer, User, Car, Policy, ChooseGarageRequest, Claim, ClaimStatus, sequelize, Garage } = require('../models');
 const authenticate = require('../middlewares/authenticate');
 
 
@@ -142,6 +142,32 @@ router.post('/claims/:claimId/select-garage', authenticate, async (req, res) => 
 
   } catch (error) {
     console.error('Error selecting garage:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/customer/garages
+ * @desc    (P13) ดึงรายชื่ออู่ซ่อมทั้งหมด
+ * @access  Private (Customer)
+ */
+router.get('/garages', authenticate, async (req, res) => {
+  try {
+    // ⭐️ (2) ดึงข้อมูลอู่ทั้งหมดจาก Model 'Garage'
+    const garages = await Garage.findAll({
+      attributes: [
+        'id', 
+        'garageName', 
+        'address', 
+        'googleMapsUrl', 
+        'photoURL',
+      ]
+    });
+
+    res.status(200).json(garages); // ⭐️ (3) ส่งข้อมูล (Array) กลับไป
+
+  } catch (error) {
+    console.error('Error fetching garages:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
