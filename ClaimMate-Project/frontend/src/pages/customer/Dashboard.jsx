@@ -256,8 +256,8 @@ const CustomerDashboard = () => {
                                                 }
 
                                                 // ถ้าถึงขั้น "เลือกอู่ซ่อม" แต่ยังไม่เลือก
-                                                if (claim.currentStep === 'garage_selected' && !claim.garage) {
-                                                    return <span className="text-warning">รอเลือกอู่</span>;
+                                                if (claim.currentStep === 3 && !claim.garage) {
+                                                    return <span className="text-warning">กรุณาเลือกอู่ซ่อม</span>;
                                                 }
 
                                                 // ถ้ามีอู่แล้ว (เลือกและยืนยันแล้ว)

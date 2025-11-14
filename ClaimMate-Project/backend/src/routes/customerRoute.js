@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { Customer, User, Car, Policy } = require('../models');
+const authenticate = require('../middlewares/authenticate');
+
 
 /**
  * @route   GET /api/customers/search/by-idcard/:citizenId
@@ -76,6 +78,72 @@ router.get('/search/by-idcard/:citizenId', async (req, res) => {
         console.error('Error searching customer:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
+});
+
+/**
+ * @route   POST /api/customer/claims/:claimId/select-garage
+ * @desc    (P13) ลูกค้ายืนยันการเลือกอู่
+ * @access  Private (Customer)
+ */
+router.post('/claims/:claimId/select-garage', authenticate, async (req, res) => {
+  const { claimId } = req.params;
+  const { garageId } = req.body; // หน้า SelectGarage ต้องส่ง garageId มาใน body
+
+  try {
+    // 1. ค้นหา Customer ID จาก User ที่ล็อกอิน
+    const customer = await Customer.findOne({ where: { userId: req.user.id } });
+    if (!customer) {
+      return res.status(403).json({ message: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+      // 2. ตรวจสอบว่า Claim นี้เป็นของ Customer คนนี้จริง
+      const claim = await Claim.findOne({ 
+        where: { id: claimId, customerId: customer.id },
+        transaction: t 
+      });
+
+      if (!claim) {
+        await t.rollback();
+        return res.status(404).json({ message: 'ไม่พบเคสเคลมนี้ หรือคุณไม่มีสิทธิ์' });
+      }
+
+      // 3. ตรวจสอบว่ามีคำขอที่ค้าง (pending) อยู่กับอู่อื่นหรือไม่
+      const existingRequest = await ChooseGarageRequest.findOne({
+        where: { claimId: claimId, garageStatus: 'pending' },
+        transaction: t
+      });
+
+      if (existingRequest) {
+        await t.rollback();
+        return res.status(400).json({ message: 'คุณได้ส่งคำขอเลือกอู่ไปแล้ว กำลังรออู่ยืนยัน' });
+      }
+
+      // 4. สร้างคำขอใหม่ (ChooseGarageRequest) เพื่อส่งให้ Garage
+      await ChooseGarageRequest.create({
+        claimId: claimId,
+        garageId: garageId,
+        garageStatus: 'pending', // สถานะนี้ที่หน้า GaragePending จะเห็น
+        requestDate: new Date(),
+      }, { transaction: t });
+
+      // (เราจะไม่เปลี่ยนสถานะ ClaimStatus ตอนนี้
+      //  เราจะรอให้ Garage กด "รับงาน" ก่อน สถานะถึงจะเปลี่ยนเป็น 'repair')
+
+      await t.commit();
+      res.status(201).json({ success: true, message: 'ส่งคำขอไปยังอู่เรียบร้อย' });
+
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
+
+  } catch (error) {
+    console.error('Error selecting garage:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 });
 
 module.exports = router;
