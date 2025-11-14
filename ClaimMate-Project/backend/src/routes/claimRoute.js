@@ -715,4 +715,38 @@ router.get('/history', async (req, res) => {
     }
 });
 
+// 11. ⭐️ (Route ใหม่ - สำหรับ Sidebar Stats) ⭐️
+/**
+ * @route   GET /api/claims/stats
+ * @desc    (NEW) ดึงข้อมูลสถิติจำนวนเคสสำหรับ Sidebar
+ * @access  Private (Insurance)
+ */
+router.get('/stats', async (req, res) => {
+    try {
+        // 1. เคลมทั้งหมด (นับจากตาราง Claim)
+        const totalClaims = await Claim.count();
+
+        // 2. รอดำเนินการ (นับจาก ClaimStatus)
+        const pendingClaims = await ClaimStatus.count({
+            where: { isClosed: false }
+        });
+
+        // 3. เสร็จสิ้น (นับจาก ClaimStatus)
+        const completedClaims = await ClaimStatus.count({
+            where: { isClosed: true }
+        });
+
+        // ส่งข้อมูลกลับเป็น JSON object
+        res.status(200).json({
+            totalClaims: totalClaims,
+            pendingClaims: pendingClaims,
+            completedClaims: completedClaims
+        });
+
+    } catch (error) {
+        console.error('Error fetching claim stats:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
 module.exports = router;
