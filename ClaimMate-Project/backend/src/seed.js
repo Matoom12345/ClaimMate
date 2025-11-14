@@ -14,10 +14,10 @@ async function seedDatabase() {
     console.log('🌱 Starting seeding process (Strictly following models)...');
 
     try {
-        
+
         await db.sequelize.sync({ force: true });
         console.log('🔄 Database synced! (Dropped old data)');
-        
+
         // --- 1. สร้างพนักงานบริษัทประกัน (Insurance Staff) 3 คน ---
         console.log('👤 Creating Insurance Staff (as per User.js & Insurance.js)...');
 
@@ -38,7 +38,7 @@ async function seedDatabase() {
         // พนักงานคนที่ 3 (วิชัย)
         const insuranceUser3 = await db.User.create({
             role: 'insurance', firstName: 'วิชัย', lastName: 'ว่องไว',
-            email: 'staff3@claimmate.com', phoneNumber: '0810003333'
+            email: 'dheerawat.w@ku.th', phoneNumber: '0810003333'
         });
         const staff3 = await db.Insurance.create({ userId: insuranceUser3.id });
 
@@ -170,7 +170,7 @@ async function seedDatabase() {
             googleMapsUrl: null, photoURL: null
         });
 
-        
+
         // --- 3. สร้างลูกค้า (Customers) 8 คน, รถ (Cars) และ กรมธรรม์ (Policies) ---
         console.log('👥 Creating 8 Customers, Cars, and Policies...');
 
@@ -266,7 +266,7 @@ async function seedDatabase() {
         console.log('Creating C4: ปิติ (5 cars)...');
         let userC4 = await db.User.create({
             role: 'customer', firstName: 'ปิติ', lastName: 'ยินดี',
-            email: 'piti@email.com', phoneNumber: '0844444444'
+            email: 'dheerawat.w@gmail.com', phoneNumber: '0844444444'
         });
         const customerC4 = await db.Customer.create({
             userId: userC4.id, citizenId: '4444444444444'
@@ -456,7 +456,7 @@ async function seedDatabase() {
             carId: carC7_1.id,          // เคลมรถ Pajero
             insuranceId: staff2.id,     // อารยา (Staff2) เป็นคนรับเคส
             garageId: garage2.id,       // ซ่อมที่อู่ เจริญพงษ์ (Garage2)
-            incidentDate: getDate(2024, 10, 5, 18, 0), 
+            incidentDate: getDate(2024, 10, 5, 18, 0),
             location: 'ลานจอดรถห้างสรรพสินค้า',
             detail: 'ถอยชนเสา กระจกมองข้างแตก',
             estimateCost: 8000.0,
@@ -491,7 +491,7 @@ async function seedDatabase() {
             carId: carC8_2.id,          // เคลมรถ Altis
             insuranceId: staff3.id,     // วิชัย (Staff3) เป็นคนรับเคส
             garageId: garage3.id,       // ซ่อมที่อู่ ส รุ่งโรจน์ (Garage3)
-            incidentDate: getDate(2025, 1, 15, 8, 15), 
+            incidentDate: getDate(2025, 1, 15, 8, 15),
             location: 'ถนนวิภาวดีรังสิต',
             detail: 'มอเตอร์ไซค์เฉี่ยวประตูหลังซ้ายเป็นรอยยาว',
             estimateCost: 10000.0,
@@ -535,7 +535,7 @@ async function seedDatabase() {
         console.error('❌ Error seeding database:', error);
     } finally {
         console.log('Database connection closed.');
-        await db.sequelize.close(); 
+        await db.sequelize.close();
     }
 }
 

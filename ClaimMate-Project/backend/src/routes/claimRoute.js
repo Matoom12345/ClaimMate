@@ -14,6 +14,7 @@ const {
     RepairItem,
     AdditionalSurvey,
     Satisfaction,
+    Garage,
     sequelize
 } = require('../models');
 const { Op } = require('sequelize');
@@ -131,7 +132,8 @@ router.get('/active', async (req, res) => {
 // 4. (คงไว้) Route เดิม (Create Claim)
 /**
  * @route   POST /api/claims
- * @desc    (คงไว้) สร้างเคสเคลมใหม่
+ * @desc    สร้างเคสเคลมใหม่
+ * @access  Private (Insurance)
  */
 router.post('/', async (req, res) => {
     const {
@@ -748,5 +750,285 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+
+/**
+ * @route   GET /api/claims/customer/:customerId
+ * @desc    ดึงรายการเคลมทั้งหมดของลูกค้าคนหนึ่ง
+ * @access  Private (Customer)
+ */
+router.get('/customer/:customerId', async (req, res) => {
+    const { customerId } = req.params;
+    try {
+        const claims = await Claim.findAll({
+            where: { customerId },
+            include: [
+                {
+                    model: ClaimStatus,
+                    required: false // ใช้ Left Join เผื่อเคสที่เพิ่งสร้างและอาจยังไม่มี status (กันเหนียว)
+                },
+                {
+                    model: Car,
+                    attributes: ['brand', 'model', 'year', 'licensePlate']
+                },
+
+                 /*   model: Garage, // เพิ่ม Garage เพื่อให้ Frontend แสดงชื่ออู่ได้
+                    attributes: ['name', 'id']
+                }*/
+            ],
+            order: [['createdAt', 'DESC']] // เรียงจากใหม่ไปเก่า
+        });
+
+        // Helper function สำหรับดึง state อย่างปลอดภัย
+        const getState = (c) => c.ClaimStatus ? c.ClaimStatus.state : 'unknown';
+
+        // ✅ แก้ไข Logic การนับตาม ENUM จริงใน ClaimStatus.js
+        const summary = {
+            total: claims.length,
+
+            // Pending (รอดำเนินการ): คือสถานะ 'open_case' (เพิ่งเปิดเคส)
+            pending: claims.filter(c =>
+                ['open_case'].includes(getState(c))
+            ).length,
+
+            // In Progress (กำลังดำเนินการ): รวม process กลางทางทั้งหมด
+            inProgress: claims.filter(c =>
+                ['survey', 'approved', 'choose_garage', 'repair'].includes(getState(c))
+            ).length,
+
+            // Completed (เสร็จสิ้น): สถานะ 'completed'
+            completed: claims.filter(c =>
+                ['completed'].includes(getState(c))
+            ).length
+        };
+
+        res.status(200).json({ claims, summary });
+    } catch (error) {
+        console.error('Error fetching claims:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+/**
+ * @route   GET /api/claims/customer/:customerId/stats
+ * @desc    ดึงสถิติการเคลม (total, ongoing, completed)
+ * @access  Private (Customer)
+ */
+router.get('/customer/:customerId/stats', async (req, res) => {
+    const { customerId } = req.params;
+    try {
+        const claims = await Claim.findAll({
+            where: { customerId },
+            include: [{
+                model: ClaimStatus,
+                required: false // Left Join เผื่อเคสที่ยังไม่มีสถานะ
+            }],
+        });
+
+        const total = claims.length;
+
+        // 🔴 แก้ไข Logic การนับ: เช็คจาก state ที่มีอยู่จริงใน ENUM
+        // รายการที่ถือว่า "กำลังดำเนินการ" (Ongoing)
+        const ongoingStates = ['open_case', 'survey', 'approved', 'choose_garage', 'repair'];
+
+        // รายการที่ถือว่า "เสร็จสิ้น" (Completed)
+        const completedStates = ['completed'];
+
+        const ongoing = claims.filter(c => {
+            const s = c.ClaimStatus; // สมมติว่าเป็น 1:1 ถ้าเป็น 1:M ต้องใช้ c.ClaimStatuses[0]
+            return s && ongoingStates.includes(s.state);
+        }).length;
+
+        const completed = claims.filter(c => {
+            const s = c.ClaimStatus;
+            return s && completedStates.includes(s.state);
+        }).length;
+
+        res.status(200).json({
+            stats: { total, ongoing, completed },
+        });
+    } catch (error) {
+        // ... error handling
+    }
+});
+
+// ==========================================
+// 🟢 ส่วนที่เพิ่มใหม่สำหรับหน้า Customer ClaimDetail
+// ==========================================
+
+/**
+ * @route   GET /api/claims/detail/:id
+ * @desc    ดึงข้อมูลพื้นฐานของเคลม (Header, Vehicle, Garage, Officer)
+ * @access  Private (Customer)
+ */
+router.get('/detail/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const claim = await Claim.findOne({
+            where: { id },
+            include: [
+                { model: ClaimStatus, required: false },
+                {
+                    model: Car,
+                    required: false,
+                    // ✅ แก้ไข: ย้าย Policy เข้ามาซ้อนใน Car
+                    include: [{ model: Policy, required: false }]
+                },
+                { model: Garage, required: false },
+                {
+                    model: Insurance,
+                    include: [{ model: User, attributes: ['firstName', 'lastName', 'phoneNumber', 'email'] }],
+                    required: false
+                }
+                // ❌ ลบ { model: Policy, required: false } ที่เคยอยู่ตรงนี้ออก
+            ]
+        });
+
+        if (!claim) return res.status(404).json({ message: 'Claim not found' });
+
+        const status = claim.ClaimStatus || {};
+        const car = claim.Car || {};
+        const policy = car.Policy || {}; // ✅ ดึง Policy จาก Car แทน
+        const garage = claim.Garage || {};
+        const insuranceUser = claim.Insurance?.User || {};
+
+        // Flatten Data ตามที่ Frontend 'c' คาดหวัง
+        const formattedClaim = {
+            id: claim.id,
+            claimNumber: `CLM-${claim.id}`,
+            incidentDate: claim.incidentDate,
+            location: claim.location,
+            detail: claim.detail,
+            state: status.state || 'open_case',
+            priority: status.urgentRepair ? 'urgent' : 'normal',
+
+            // Timeline Dates
+            reportedDate: status.reportedDate,
+            inspectionDate: status.inspectionDate,
+            approvalDate: status.approvalDate,
+            garageSelectedDate: status.garageSelectedDate,
+            repairStartDate: status.repairDate,
+            completedDate: status.completedDate,
+
+            // Costs
+            estimatedCost: claim.estimateCost || 0,
+            approvedCost: claim.approvedCost || 0,
+            additionalCost: claim.additionalCost || 0,
+
+            // Vehicle
+            carBrand: car.brand,
+            carModel: car.model,
+            carYear: car.year,
+            carColor: car.color,
+            licensePlate: car.licensePlate,
+            engineID: car.engineID,
+
+            // Policy (เผื่อใช้งาน)
+            policyNumber: policy.policyNumber,
+            coverageAmount: policy.coverageAmount,
+
+            // Garage
+            garageName: garage.name,
+            garagePhone: garage.phone,
+            garageEmail: garage.email,
+
+            // Officer
+            insuranceFirstName: insuranceUser.firstName,
+            insuranceLastName: insuranceUser.lastName,
+            insurancePhone: insuranceUser.phoneNumber,
+            insuranceEmail: insuranceUser.email,
+        };
+
+        res.json({ claim: formattedClaim });
+    } catch (error) {
+        console.error('Error fetching claim detail:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+/**
+ * @route   GET /api/claims/full-detail/:id
+ * @desc    ดึงรูปภาพและรายการซ่อม (Repair Items & Photos)
+ * @access  Private (Customer)
+ */
+router.get('/full-detail/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const claim = await Claim.findOne({
+            where: { id },
+            include: [
+                { model: AccidentPhoto, separate: true },
+                { model: RepairItem, separate: true },
+                {
+                    model: Car,
+                    include: [{ model: Policy }]
+                }
+            ]
+        });
+
+        if (!claim) return res.status(404).json({ message: 'Claim not found' });
+
+        // ดึงวงเงินประกัน
+        const policy = claim.Car?.Policy || {};
+        const insuranceBalance = policy.coverageAmount || 25000; // ค่าสมมติถ้าไม่มีข้อมูล
+
+        res.json({
+            photos: claim.AccidentPhotos || [],
+            repairItems: claim.RepairItems || [],
+            claim: {
+                insuranceBalance: insuranceBalance,
+                priorityLevel: 'normal' // ค่า default
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching full detail:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+/**
+ * @route   POST /api/claims/:id/accept-extra-cost
+ * @desc    ลูกค้ายืนยันยอมรับค่าใช้จ่ายส่วนเกิน
+ * @access  Private (Customer)
+ */
+router.post('/:id/accept-extra-cost', async (req, res) => {
+    const { id } = req.params;
+    const { extraCost } = req.body;
+
+    try {
+        const t = await sequelize.transaction();
+
+        try {
+            // 1. อัปเดต Additional Cost ในตาราง Claim
+            await Claim.update({
+                additionalCost: extraCost
+            }, { where: { id }, transaction: t });
+
+            // 2. เปลี่ยนสถานะเป็น Approved (เพื่อให้ดำเนินการต่อได้)
+            await ClaimStatus.update({
+                status: 'approved', // หรือ status อื่นตาม Flow งาน
+                state: 'approved',
+                currentStep: 3, // ขยับ Step ไปข้างหน้า
+                approvalDate: new Date()
+            }, { where: { claimId: id }, transaction: t });
+
+            // 3. (Optional) ปิด Job AdditionalSurvey ถ้ามี
+            await AdditionalSurvey.update({
+                status: 'approved'
+            }, { where: { claimId: id, status: 'pending' }, transaction: t });
+
+            await t.commit();
+            res.json({ success: true, message: 'Accepted extra cost successfully' });
+
+        } catch (err) {
+            await t.rollback();
+            throw err;
+        }
+    } catch (error) {
+        console.error('Error accepting extra cost:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
 
 module.exports = router;

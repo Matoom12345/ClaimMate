@@ -109,4 +109,7 @@ ChooseGarageRequest.belongsTo(Claim, { foreignKey: 'claimId' });
 Garage.hasMany(ChooseGarageRequest, { foreignKey: 'garageId', onDelete: 'CASCADE' });
 ChooseGarageRequest.belongsTo(Garage, { foreignKey: 'garageId' });
 
+Claim.hasMany(ClaimStatus, { foreignKey: 'claimId' });
+ClaimStatus.belongsTo(Claim, { foreignKey: 'claimId' });
+
 module.exports = db;
