@@ -20,6 +20,12 @@ const RepairItem = sequelize.define('RepairItem', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
+    status: {
+        type: DataTypes.ENUM('in_progress', 'completed'),
+        defaultValue: 'in_progress',
+        allowNull: false,
+        comment: 'สถานะการซ่อมล่าสุดของรายการนี้ (เขียนทับได้)'
+    }
 }, {
     tableName: 'repair_items',
     timestamps: false,

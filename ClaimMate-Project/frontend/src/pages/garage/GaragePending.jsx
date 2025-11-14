@@ -1,24 +1,41 @@
 // นำเข้า components ที่ใช้
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // (มีอยู่แล้ว)
-import { Link } from 'react-router-dom'; // (มีอยู่แล้ว)
-import { Card, CardHeader, CardTitle, CardBody, Badge, Button, Modal, Loading } from '../../components'; // (เพิ่ม Loading ถ้ามี)
-import { format } from 'date-fns'; // (มีอยู่แล้ว)
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardBody, Badge, Button, Modal, StatusBadge } from '../../components';
+import { format } from 'date-fns';
 
-// (1) ลบ mockData ทั้งหมดทิ้งไป
-// const mockData = [ ... ];
-
+/**
+ * GaragePending - หน้ารายการขอเข้าซ่อม
+ * Features:
+ * 1. แสดงรายการเคลมที่รอยืนยัน (API Integration)
+ * 2. การ์ดสวยงาม แสดงข้อมูลครบถ้วน
+ * 3. Modal ดูรายละเอียดใบเคลม
+ * 4. ปุ่มรับงาน/ปฏิเสธ พร้อม Confirmation Modal
+ */
 const GaragePending = () => {
-  // (2) แก้ไข State เริ่มต้น
-  const [claims, setClaims] = useState([]); // <-- แก้ไข: เริ่มต้นด้วย Array ว่าง
-  const [loading, setLoading] = useState(true); // <-- แก้ไข: เริ่มต้นด้วย true
-  const [error, setError] = useState(null); // (มีอยู่แล้ว)
-  const [showAcceptModal, setShowAcceptModal] = useState(false); // (มีอยู่แล้ว)
-  const [showRejectModal, setShowRejectModal] = useState(false); // (มีอยู่แล้ว)
-  const [selectedClaim, setSelectedClaim] = useState(null); // (มีอยู่แล้ว)
-  const [submitting, setSubmitting] = useState(false); // <-- (3) เพิ่ม state นี้ ไว้ล็อคปุ่มใน Modal
+  // ===== State Management =====
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedClaim, setSelectedClaim] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Modal States
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // Detail Modal States
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [claimDetail, setClaimDetail] = useState(null);
 
-  // (4) สร้างฟังก์ชันสำหรับดึงข้อมูล (Fetch Data)
+  // ===== useEffect: โหลดข้อมูลครั้งแรก =====
+  useEffect(() => {
+    fetchPendingJobs();
+  }, []);
+
+  // ===== Function: ดึงข้อมูลรายการขอเข้าซ่อม =====
   const fetchPendingJobs = async () => {
     setLoading(true);
     setError(null);
@@ -28,9 +45,8 @@ const GaragePending = () => {
         throw new Error('ไม่พบ Token, กรุณาล็อกอินใหม่');
       }
 
-      // **สำคัญ**: แก้ Port เป็น 3000 (ตามไฟล์ backend/server.js ของคุณ)
       const response = await axios.get(
-        'http://localhost:3000/api/garages/pending-requests', // <-- แก้ไข Port
+        'http://localhost:3000/api/garages/pending-requests',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -38,7 +54,7 @@ const GaragePending = () => {
         }
       );
 
-      setClaims(response.data); // <-- API จะคืนค่า Array ของ ChooseGarageRequest
+      setClaims(response.data);
     } catch (err) {
       console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', err);
       setError(err.response?.data?.message || err.message || 'ไม่สามารถดึงข้อมูลได้');
@@ -47,26 +63,127 @@ const GaragePending = () => {
     }
   };
 
-  // (5) แก้ไข useEffect ให้เรียกฟังก์ชันดึงข้อมูล
-  useEffect(() => {
-    fetchPendingJobs();
-  }, []); // [] ทำงานครั้งเดียว
+  // ===== Function: ดูรายละเอียดใบเคลม =====
+  const handleViewDetail = async (job) => {
+    setDetailLoading(true);
+    setShowDetailModal(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const claimId = job.Claim?.claimNumber || job.Claim?.id;
+      
+      // ดึงข้อมูลเต็มจาก API (ใช้ endpoint เดียวกับลูกค้า)
+      const [detailRes, fullDetailRes] = await Promise.all([
+        axios.get(`http://localhost:3000/api/claims/detail/${claimId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`http://localhost:3000/api/claims/full-detail/${claimId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
 
-  // (6) แก้ไขฟังก์ชัน "รับงาน" (handleAcceptClaim)
+      if (!detailRes.data.claim) {
+        throw new Error('ไม่พบข้อมูลเคลม');
+      }
+
+      const c = detailRes.data.claim;
+      const fullData = fullDetailRes.data || {};
+      const rawPhotos = fullData.photos || [];
+      const rawRepairItems = fullData.repairItems || [];
+
+      // สร้างข้อมูลรถยนต์
+      const vehicle = {
+        brand: c.carBrand || "",
+        model: c.carModel || "",
+        color: c.carColor || "",
+        year: c.carYear,
+        licensePlate: c.licensePlate || "",
+        chassisNumber: c.engineID || "",
+      };
+
+      // สร้างข้อมูลอู่ (ถ้ามี)
+      const garage = c.garageName
+        ? {
+            name: c.garageName,
+            phone: c.garagePhone,
+            email: c.garageEmail,
+            address: c.garageAddress,
+            googleMapsUrl: c.googleMapsUrl
+          }
+        : null;
+
+      // สร้างข้อมูลเจ้าหน้าที่
+      const assignedOfficer = {
+        name: (c.insuranceFirstName || "") + " " + (c.insuranceLastName || ""),
+        phone: c.insurancePhone || "",
+        email: c.insuranceEmail || ""
+      };
+
+      // Timeline
+      const timeline = {
+        reportedDate: c.reportedDate || "",
+        inspectionDate: c.inspectionDate || "",
+        approvalDate: c.approvalDate || "",
+        garageSelectedDate: c.garageSelectedDate || "",
+        repairStartDate: c.repairStartDate || "",
+        completedDate: c.completedDate || "",
+      };
+
+      // รูปภาพ
+      const images = rawPhotos.map(p => ({
+        id: p._id,
+        url: p.photoUrl,
+        caption: p.caption || '',
+        type: p.type || 'damage'
+      }));
+
+      // รายการซ่อม
+      const items = rawRepairItems.map(item => ({
+        id: item._id,
+        name: item.itemName,
+        cost: item.cost || 0
+      }));
+
+      setClaimDetail({
+        id: c.id,
+        claimNumber: c.claimNumber,
+        detail: c.detail,
+        location: c.location,
+        status: c.state,
+        currentStep: c.currentStep,
+        incidentDate: c.incidentDate,
+        estimatedCost: c.estimatedCost || 0,
+        approvedAmount: c.approvedCost || 0,
+        vehicle,
+        garage,
+        timeline,
+        assignedOfficer,
+        images,
+        repairItems: items
+      });
+
+    } catch (err) {
+      console.error('Error loading claim detail:', err);
+      alert('ไม่สามารถโหลดรายละเอียดได้');
+      setShowDetailModal(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // ===== Function: รับงาน =====
   const handleAcceptClaim = async () => {
     if (!selectedClaim) return;
 
-    setSubmitting(true); // ล็อคปุ่ม
+    setSubmitting(true);
     setError(null);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('ไม่พบ Token');
 
-      // ยิง API ไปที่ Backend (ที่เราสร้างในส่วนที่ 1)
-      // selectedClaim.id คือ ID ของ ChooseGarageRequest
       await axios.post(
         `http://localhost:3000/api/garages/requests/${selectedClaim.id}/accept`,
-        {}, // body ว่าง
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -74,36 +191,35 @@ const GaragePending = () => {
         }
       );
 
-      // สำเร็จ: เอารายการนี้ออกจาก state (เพื่อให้ UI อัปเดตทันที)
+      // สำเร็จ: เอารายการออกจาก list
       setClaims((prevJobs) =>
         prevJobs.filter((job) => job.id !== selectedClaim.id)
       );
-      setShowAcceptModal(false); // ปิด Modal
+      setShowAcceptModal(false);
       setSelectedClaim(null);
+      alert('รับงานเรียบร้อยแล้ว!');
 
     } catch (err) {
       console.error('Error accepting job:', err);
       setError(err.response?.data?.message || 'เกิดข้อผิดพลาดในการรับงาน');
-      // (อาจจะแสดง Error ใน Modal)
     } finally {
-      setSubmitting(false); // ปลดล็อคปุ่ม
+      setSubmitting(false);
     }
   };
 
-  // (7) แก้ไขฟังก์ชัน "ปฏิเสธงาน" (handleRejectClaim)
+  // ===== Function: ปฏิเสธงาน =====
   const handleRejectClaim = async () => {
     if (!selectedClaim) return;
 
-    setSubmitting(true); // ล็อคปุ่ม
+    setSubmitting(true);
     setError(null);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('ไม่พบ Token');
 
-      // ยิง API ไปที่ Backend (ที่เราสร้างในส่วนที่ 1)
       await axios.post(
         `http://localhost:3000/api/garages/requests/${selectedClaim.id}/reject`,
-        {}, // body ว่าง
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -111,147 +227,407 @@ const GaragePending = () => {
         }
       );
 
-      // สำเร็จ: เอารายการนี้ออกจาก state
+      // สำเร็จ: เอารายการออกจาก list
       setClaims((prevJobs) =>
         prevJobs.filter((job) => job.id !== selectedClaim.id)
       );
-      setShowRejectModal(false); // ปิด Modal
+      setShowRejectModal(false);
       setSelectedClaim(null);
+      alert('ปฏิเสธงานเรียบร้อยแล้ว');
 
     } catch (err) {
       console.error('Error rejecting job:', err);
       setError(err.response?.data?.message || 'เกิดข้อผิดพลาดในการปฏิเสธงาน');
     } finally {
-      setSubmitting(false); // ปลดล็อคปุ่ม
+      setSubmitting(false);
     }
   };
 
-  // (ส่วน Modal Handlers (handleShow...Modal) ใช้โค้ดเดิมของคุณได้เลย)
+  // ===== Modal Handlers =====
   const handleShowAcceptModal = (claim) => {
-    setSelectedClaim(claim); // 'claim' ที่ได้จาก .map() คือ 'job'
+    setSelectedClaim(claim);
     setShowAcceptModal(true);
   };
 
   const handleShowRejectModal = (claim) => {
-    setSelectedClaim(claim); // 'claim' ที่ได้จาก .map() คือ 'job'
+    setSelectedClaim(claim);
     setShowRejectModal(true);
   };
 
-  // === (8) แก้ไขส่วน JSX ===
-
-  // ส่วนแสดงผลตอน Loading
+  // ===== Render: Loading State =====
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-insurance-blue">
-          รายการงานที่รอดำเนินการ
-        </h1>
-        {/* ใช้ Component Loading ของคุณ หรือแสดงข้อความ */}
-        {/* <Loading /> */}
-        <Card className="text-center"><p>กำลังโหลด...</p></Card>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-dark mb-2">
+            รายการขอเข้าซ่อม
+          </h1>
+          <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
+        </div>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">refresh</span>
+            <p className="text-neutral-500">กำลังโหลดรายการขอเข้าซ่อม...</p>
+          </div>
+        </div>
       </div>
     );
   }
-  
-  // ส่วนแสดงผลตอน Error (ถ้าดึงข้อมูลไม่สำเร็จเลย)
+
+  // ===== Render: Error State =====
   if (error && claims.length === 0) {
-     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-insurance-blue">
-          รายการงานที่รอดำเนินการ
-        </h1>
-        <Card className="text-center bg-red-50 border-red-200">
-          <p className="text-red-600 font-semibold">เกิดข้อผิดพลาด:</p>
-          <p className="text-red-500">{error}</p>
-          <Button onClick={fetchPendingJobs} className="mt-4">
-            ลองใหม่อีกครั้ง
-          </Button>
-        </Card>
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-dark mb-2">
+            รายการขอเข้าซ่อม
+          </h1>
+          <p className="text-neutral-500">เกิดข้อผิดพลาด</p>
+        </div>
+        <div className="card-static bg-error/10 border border-error">
+          <div className="text-center py-12">
+            <span className="material-icons-round text-6xl text-error mb-4">error_outline</span>
+            <p className="text-error font-semibold mb-2">เกิดข้อผิดพลาด</p>
+            <p className="text-neutral-600 mb-4">{error}</p>
+            <Button onClick={fetchPendingJobs} variant="primary">
+              <span className="material-icons-round mr-2">refresh</span>
+              ลองใหม่อีกครั้ง
+            </Button>
+          </div>
+        </div>
       </div>
-     )
+    );
   }
 
+  // ===== Render: Main Content =====
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-insurance-blue">
-        รายการงานที่รอดำเนินการ
-      </h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-neutral-dark mb-2">
+          รายการขอเข้าซ่อม
+        </h1>
+        <p className="text-neutral-500">
+          งานซ่อมที่รอการยืนยันจากอู่ ({claims.length} รายการ)
+        </p>
+      </div>
 
-      {/* (แสดง Error ถ้าเกิดตอนกดปุ่ม) */}
+      {/* Error Alert (ถ้าเกิดขณะทำ action) */}
       {error && submitting && (
-         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-          <span className="block sm:inline">{error}</span>
+        <div className="card-static bg-error/10 border border-error">
+          <div className="flex items-center gap-3">
+            <span className="material-icons-round text-error">error</span>
+            <p className="text-error">{error}</p>
+          </div>
         </div>
       )}
 
-      {/* (9) ตรวจสอบ claims.length */}
+      {/* Empty State */}
       {claims.length === 0 ? (
-        <Card className="text-center">
-          <p className="text-gray-500">ยังไม่มีงานที่รอดำเนินการในขณะนี้</p>
-        </Card>
+        <div className="card-static text-center py-16">
+          <span className="material-icons-round text-6xl text-neutral-300 mb-4">
+            inbox
+          </span>
+          <p className="text-neutral-500 text-lg mb-2">
+            ไม่มีงานที่รอดำเนินการ
+          </p>
+          <p className="text-neutral-400 text-sm">
+            เมื่อมีลูกค้าเลือกอู่ของคุณ รายการจะปรากฏที่นี่
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* (10) แก้ไขตัวแปรใน .map() ให้ตรงกับ API Response */}
-          {claims.map((job) => ( // 'job' คือ ChooseGarageRequest
-            <Card key={job.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
-              <CardHeader className="flex justify-between items-center">
-                <CardTitle>
-                  {/* เราต้องเจาะลึกไปที่ job.Claim.Car */}
-                  {job.Claim?.Car?.brand} {job.Claim?.Car?.model}
-                </CardTitle>
-                <Badge color="yellow">รอดำเนินการ</Badge>
-              </CardHeader>
-              <CardBody className="flex-grow">
-                {/* ใช้ Optional Chaining (?) ป้องกัน error ถ้าข้อมูลไม่มี */}
-                <p>
-                  <strong>เลขทะเบียน:</strong> {job.Claim?.Car?.licensePlate || 'N/A'}
-                </p>
-                <p>
-                  <strong>ลูกค้า:</strong> {job.Claim?.Customer?.User?.firstName || ''}{' '}
-                  {job.Claim?.Customer?.User?.lastName || 'N/A'}
-                </p>
-                <p>
-                  <strong>วันที่แจ้งเรื่อง:</strong>{' '}
-                  {job.createdAt
-                    ? format(new Date(job.createdAt), 'dd/MM/yyyy HH:mm')
-                    : 'N/A'}
-                </p>
-              </CardBody>
-              <div className="p-4 border-t border-neutral-100 flex flex-col sm:flex-row gap-2">
-                <Button
-                  variant="primary"
-                  fullWidth
-                  icon="check"
-                  onClick={() => handleShowAcceptModal(job)} // <-- ส่ง 'job' ทั้งก้อน
-                  className="flex-1"
-                >
-                  รับงาน
-                </Button>
-                <Button
-                  variant="danger"
-                  fullWidth
-                  icon="cancel"
-                  onClick={() => handleShowRejectModal(job)} // <-- ส่ง 'job' ทั้งก้อน
-                  className="flex-1 bg-error"
-                >
-                  ปฏิเสธ
-                </Button>
-                <Link
-                  to={`/garage/pending/${job.id}`} // <-- (11) ID นี้คือ ChooseGarageRequest ID
-                  className="flex-1"
-                >
-                  <Button variant="outline" fullWidth>
-                    ดูรายละเอียด
-                  </Button>
-                </Link>
+        // Cards List
+        <div className="space-y-4">
+          {claims.map((job) => (
+            <div
+              key={job.id}
+              className="card hover:shadow-card-hover transition-all duration-300"
+            >
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* ส่วนซ้าย: ข้อมูลหลัก */}
+                <div className="flex-1 space-y-4">
+                  {/* Header: ข้อมูลรถ + Badge */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-warning/20 flex items-center justify-center">
+                        <span className="material-icons-round text-2xl text-warning">
+                          directions_car
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold text-neutral-dark">
+                          {job.Claim?.Car?.brand} {job.Claim?.Car?.model}
+                        </h3>
+                        <p className="text-sm text-neutral-500">
+                          {job.Claim?.Car?.color} • ปี {job.Claim?.Car?.year}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="warning" size="lg">
+                      <span className="material-icons-round text-sm mr-1">pending</span>
+                      รอดำเนินการ
+                    </Badge>
+                  </div>
+
+                  {/* ข้อมูลเพิ่มเติม */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="material-icons-round text-neutral-400 text-lg">badge</span>
+                      <div>
+                        <p className="text-neutral-500 text-xs">เลขทะเบียน</p>
+                        <p className="font-semibold text-neutral-dark">
+                          {job.Claim?.Car?.licensePlate || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="material-icons-round text-neutral-400 text-lg">person</span>
+                      <div>
+                        <p className="text-neutral-500 text-xs">ลูกค้า</p>
+                        <p className="font-semibold text-neutral-dark">
+                          {job.Claim?.Customer?.User?.firstName || ''} {job.Claim?.Customer?.User?.lastName || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="material-icons-round text-neutral-400 text-lg">event</span>
+                      <div>
+                        <p className="text-neutral-500 text-xs">วันที่แจ้งเรื่อง</p>
+                        <p className="font-semibold text-neutral-dark">
+                          {job.createdAt
+                            ? format(new Date(job.createdAt), 'dd/MM/yyyy HH:mm')
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="material-icons-round text-neutral-400 text-lg">assignment</span>
+                      <div>
+                        <p className="text-neutral-500 text-xs">เลขเคส</p>
+                        <p className="font-semibold text-neutral-dark">
+                          {job.Claim?.claimNumber || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* รายละเอียดเหตุการณ์ (ถ้ามี) */}
+                  {job.Claim?.detail && (
+                    <div className="pt-4 border-t border-neutral-200">
+                      <p className="text-sm text-neutral-500 mb-1">รายละเอียดเหตุการณ์</p>
+                      <p className="text-neutral-700 line-clamp-2">
+                        {job.Claim.detail}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ส่วนขวา: ปุ่ม Actions */}
+                <div className="flex lg:flex-col gap-3 justify-end lg:justify-center lg:w-48">
+                  <button
+                    onClick={() => handleViewDetail(job)}
+                    className="btn-outline flex-1 lg:flex-none flex items-center justify-center gap-2"
+                  >
+                    <span className="material-icons-round text-lg">visibility</span>
+                    <span className="hidden sm:inline">ดูรายละเอียด</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleShowAcceptModal(job)}
+                    className="btn-primary flex-1 lg:flex-none flex items-center justify-center gap-2 bg-success hover:bg-success/90"
+                  >
+                    <span className="material-icons-round text-lg">check_circle</span>
+                    <span className="hidden sm:inline">รับงาน</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleShowRejectModal(job)}
+                    className="btn-outline !border-error !text-error hover:!bg-error hover:!text-white flex-1 lg:flex-none flex items-center justify-center gap-2"
+                  >
+                    <span className="material-icons-round text-lg">cancel</span>
+                    <span className="hidden sm:inline">ปฏิเสธ</span>
+                  </button>
+                </div>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
 
-      {/* (12) แก้ไข Modal ให้แสดงข้อมูลจาก API และล็อคปุ่ม */}
-      {/* Accept Modal */}
+      {/* ===== Modal: ดูรายละเอียด ===== */}
+      {showDetailModal && (
+        <Modal
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setClaimDetail(null);
+          }}
+          title="รายละเอียดใบเคลม"
+          size="xl"
+        >
+          {detailLoading ? (
+            <div className="text-center py-12">
+              <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">refresh</span>
+              <p className="text-neutral-500">กำลังโหลดรายละเอียด...</p>
+            </div>
+          ) : claimDetail ? (
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* ข้อมูลเคลม */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-neutral-dark">
+                      เคสเลขที่: {claimDetail.claimNumber}
+                    </h3>
+                    <StatusBadge status={claimDetail.status} size="md" />
+                  </div>
+                </div>
+
+                {/* ข้อมูลรถยนต์ */}
+                <div className="card-static bg-neutral-50">
+                  <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                    <span className="material-icons-round text-primary-500">directions_car</span>
+                    ข้อมูลรถยนต์
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-neutral-500">ยี่ห้อ/รุ่น</p>
+                      <p className="font-medium text-neutral-dark">
+                        {claimDetail.vehicle.brand} {claimDetail.vehicle.model}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">ทะเบียน</p>
+                      <p className="font-medium text-neutral-dark">{claimDetail.vehicle.licensePlate}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">สี</p>
+                      <p className="font-medium text-neutral-dark">{claimDetail.vehicle.color}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">ปี</p>
+                      <p className="font-medium text-neutral-dark">{claimDetail.vehicle.year}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* รายละเอียดเหตุการณ์ */}
+                <div className="card-static bg-neutral-50">
+                  <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                    <span className="material-icons-round text-primary-500">description</span>
+                    รายละเอียดเหตุการณ์
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-neutral-500">สถานที่เกิดเหตุ</p>
+                      <p className="font-medium text-neutral-dark">{claimDetail.location}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">รายละเอียด</p>
+                      <p className="font-medium text-neutral-dark">{claimDetail.detail}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500">วันที่เกิดเหตุ</p>
+                      <p className="font-medium text-neutral-dark">
+                        {claimDetail.incidentDate ? format(new Date(claimDetail.incidentDate), 'dd/MM/yyyy HH:mm') : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* รูปภาพความเสียหาย */}
+                {claimDetail.images && claimDetail.images.length > 0 && (
+                  <div className="card-static bg-neutral-50">
+                    <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                      <span className="material-icons-round text-primary-500">photo_library</span>
+                      รูปภาพความเสียหาย ({claimDetail.images.length})
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {claimDetail.images.map((image) => (
+                        <div key={image.id} className="group relative aspect-video rounded-lg overflow-hidden border border-neutral-200">
+                          <img
+                            src={image.url}
+                            alt={image.caption}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                            <p className="text-white text-xs line-clamp-1">{image.caption}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* รายการซ่อม */}
+                {claimDetail.repairItems && claimDetail.repairItems.length > 0 && (
+                  <div className="card-static bg-neutral-50">
+                    <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                      <span className="material-icons-round text-primary-500">build</span>
+                      รายการซ่อม
+                    </h4>
+                    <div className="space-y-2">
+                      {claimDetail.repairItems.map((item, index) => (
+                        <div key={item.id} className="flex justify-between items-center p-3 bg-white rounded-lg">
+                          <div>
+                            <p className="text-xs text-neutral-500">รายการที่ {index + 1}</p>
+                            <p className="font-medium text-neutral-dark">{item.name}</p>
+                          </div>
+                          <p className="font-semibold text-primary-600">
+                            ฿{item.cost.toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg font-semibold">
+                        <span className="text-primary-700">รวมทั้งหมด</span>
+                        <span className="text-primary-700 text-lg">
+                          ฿{claimDetail.repairItems.reduce((sum, item) => sum + item.cost, 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ข้อมูลเจ้าหน้าที่ */}
+                <div className="card-static bg-neutral-50">
+                  <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                    <span className="material-icons-round text-primary-500">support_agent</span>
+                    เจ้าหน้าที่ผู้รับผิดชอบ
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="text-neutral-500">ชื่อ:</span>{' '}
+                      <span className="font-medium text-neutral-dark">{claimDetail.assignedOfficer.name}</span>
+                    </p>
+                    <p>
+                      <span className="text-neutral-500">โทร:</span>{' '}
+                      <a href={`tel:${claimDetail.assignedOfficer.phone}`} className="font-medium text-primary-600 hover:underline">
+                        {claimDetail.assignedOfficer.phone}
+                      </a>
+                    </p>
+                    <p>
+                      <span className="text-neutral-500">อีเมล:</span>{' '}
+                      <a href={`mailto:${claimDetail.assignedOfficer.email}`} className="font-medium text-primary-600 hover:underline">
+                        {claimDetail.assignedOfficer.email}
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <span className="material-icons-round text-6xl text-neutral-300 mb-4">error_outline</span>
+              <p className="text-neutral-500">ไม่สามารถโหลดข้อมูลได้</p>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ===== Modal: ยืนยันรับงาน ===== */}
       <Modal
         isOpen={showAcceptModal}
         onClose={() => setShowAcceptModal(false)}
@@ -260,52 +636,54 @@ const GaragePending = () => {
       >
         {selectedClaim && (
           <div className="space-y-4">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-neutral-700">
-                <span className="font-semibold">เคส:</span> {selectedClaim.Claim?.id}
+            <div className="p-4 bg-success/10 rounded-lg border border-success/30">
+              <p className="text-sm text-neutral-700 mb-2">
+                <span className="font-semibold">เคส:</span> {selectedClaim.Claim?.claimNumber}
               </p>
-              <p className="text-sm text-neutral-700">
-                <span className="font-semibold">รถยนต์:</span> {selectedClaim.Claim?.Car?.brand} {selectedClaim.Claim?.Car?.model} ({selectedClaim.Claim?.Car?.plateNumber})
+              <p className="text-sm text-neutral-700 mb-2">
+                <span className="font-semibold">รถยนต์:</span> {selectedClaim.Claim?.Car?.brand} {selectedClaim.Claim?.Car?.model}
               </p>
               <p className="text-sm text-neutral-700">
                 <span className="font-semibold">ลูกค้า:</span> {selectedClaim.Claim?.Customer?.User?.firstName} {selectedClaim.Claim?.Customer?.User?.lastName}
               </p>
             </div>
-            
-            {/* แสดง Error ถ้าเกิดตอนกดปุ่ม */}
+
             {error && !submitting && (
-              <p className="text-sm text-red-600">{error}</p>
+              <div className="p-3 bg-error/10 rounded-lg border border-error">
+                <p className="text-sm text-error">{error}</p>
+              </div>
             )}
 
             <p className="text-neutral-600">
               คุณต้องการยืนยันรับงานซ่อมนี้หรือไม่?
               <br />
-              สถานะของลูกค้าจะอัปเดตเป็น "กำลังซ่อม"
+              <span className="text-sm text-neutral-500">
+                เมื่อคุณยืนยันรับซ่อม ลูกค้าจะนำรถเข้าไปที่อู่ภายใน 3 วัน
+              </span>
             </p>
+
             <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                fullWidth
+              <button
                 onClick={() => setShowAcceptModal(false)}
-                disabled={submitting} // ล็อคปุ่ม
+                disabled={submitting}
+                className="btn-ghost flex-1"
               >
                 ยกเลิก
-              </Button>
-              <Button
-                variant="primary"
-                fullWidth
-                icon="check"
+              </button>
+              <button
                 onClick={handleAcceptClaim}
-                disabled={submitting} // ล็อคปุ่ม
+                disabled={submitting}
+                className="btn-primary flex-1 bg-success hover:bg-success/90"
               >
+                <span className="material-icons-round mr-2">check_circle</span>
                 {submitting ? 'กำลังยืนยัน...' : 'ยืนยันรับงาน'}
-              </Button>
+              </button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Reject Modal */}
+      {/* ===== Modal: ยืนยันปฏิเสธ ===== */}
       <Modal
         isOpen={showRejectModal}
         onClose={() => setShowRejectModal(false)}
@@ -314,44 +692,45 @@ const GaragePending = () => {
       >
         {selectedClaim && (
           <div className="space-y-4">
-            <div className="p-4 bg-red-50 rounded-lg">
-              <p className="text-sm text-neutral-700">
-                 <span className="font-semibold">เคส:</span> {selectedClaim.Claim?.id}
+            <div className="p-4 bg-error/10 rounded-lg border border-error/30">
+              <p className="text-sm text-neutral-700 mb-2">
+                <span className="font-semibold">เคส:</span> {selectedClaim.Claim?.claimNumber}
               </p>
-               <p className="text-sm text-neutral-700">
+              <p className="text-sm text-neutral-700">
                 <span className="font-semibold">รถยนต์:</span> {selectedClaim.Claim?.Car?.brand} {selectedClaim.Claim?.Car?.model}
               </p>
             </div>
 
-            {/* แสดง Error ถ้าเกิดตอนกดปุ่ม */}
             {error && !submitting && (
-              <p className="text-sm text-red-600">{error}</p>
+              <div className="p-3 bg-error/10 rounded-lg border border-error">
+                <p className="text-sm text-error">{error}</p>
+              </div>
             )}
 
             <p className="text-neutral-600">
               คุณต้องการปฏิเสธงานซ่อมนี้ใช่หรือไม่?
               <br />
-              ลูกค้าจะได้รับการแจ้งเตือนและสามารถเลือกอู่อื่นได้
+              <span className="text-sm text-neutral-500">
+                ลูกค้าจะได้รับการแจ้งเตือนและสามารถเลือกอู่อื่นได้
+              </span>
             </p>
+
             <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                fullWidth
+              <button
                 onClick={() => setShowRejectModal(false)}
-                disabled={submitting} // ล็อคปุ่ม
+                disabled={submitting}
+                className="btn-ghost flex-1"
               >
                 ยกเลิก
-              </Button>
-              <Button
-                variant="primary"
-                fullWidth
-                icon="cancel"
+              </button>
+              <button
                 onClick={handleRejectClaim}
-                disabled={submitting} // ล็อคปุ่ม
-                className="bg-error hover:bg-red-600"
+                disabled={submitting}
+                className="btn-primary flex-1 !bg-error hover:!bg-error/90"
               >
+                <span className="material-icons-round mr-2">cancel</span>
                 {submitting ? 'กำลังปฏิเสธ...' : 'ยืนยันปฏิเสธ'}
-              </Button>
+              </button>
             </div>
           </div>
         )}
