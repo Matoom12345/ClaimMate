@@ -560,7 +560,7 @@ const ClaimDetail = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <p className="text-xs text-neutral-500 mb-1">ลูกค้า</p>
               <p className="font-medium text-neutral-dark">{claim.customerName}</p>
@@ -576,6 +576,21 @@ const ClaimDetail = () => {
             <div>
               <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p>
               <p className="font-medium text-neutral-dark">{claim.incidentDate}</p>
+            </div>
+            {/* ✅ [เพิ่ม] ส่วนที่ 1: เลขกรมธรรม์ */}
+            <div>
+              <p className="text-xs text-neutral-500 mb-1">เลขกรมธรรม์</p>
+              <p className="font-medium text-neutral-dark">
+                {/* (ใช้ '?' เพื่อป้องกัน error หาก 'vehicle' หรือ 'policyNumber' ไม่มีข้อมูล) */}
+                {claim.vehicle?.policyNumber || '-'}
+              </p>
+            </div>
+            {/* ✅ [เพิ่ม] ส่วนที่ 2: ประเภทประกัน */}
+            <div>
+              <p className="text-xs text-neutral-500 mb-1">ประเภทประกัน</p>
+              <p className="font-medium text-neutral-dark">
+                ชั้น {claim.vehicle?.insuranceClass || 'N/A'}
+              </p>
             </div>
           </div>
         </div>

@@ -15,6 +15,7 @@ const {
     AdditionalSurvey,
     Satisfaction,
     Garage,
+    ChooseGarageRequest,
     sequelize
 } = require('../models');
 const { Op } = require('sequelize');
@@ -776,12 +777,15 @@ router.get('/customer/:customerId', async (req, res) => {
                 },
                 {
                     model: Car,
-                    attributes: ['brand', 'model', 'year', 'licensePlate']
+                    attributes: ['brand', 'model', 'year', 'licensePlate'],
+                    include: [{
+                        model: Policy,
+                        attributes: ['level']
+                    }]
                 },
 
-                 /*   model: Garage, // เพิ่ม Garage เพื่อให้ Frontend แสดงชื่ออู่ได้
-                    attributes: ['name', 'id']
-                }*/
+                { model: ChooseGarageRequest },
+
             ],
             order: [['createdAt', 'DESC']] // เรียงจากใหม่ไปเก่า
         });
@@ -891,12 +895,14 @@ router.get('/detail/:id', async (req, res) => {
             ]
         });
 
-        if (!claim) return res.status(404).json({ message: 'Claim not found' });
+        if (!claim) {
+            return res.status(404).json({ message: 'Claim not found' });
+        }
 
         const status = claim.ClaimStatus || {};
         const car = claim.Car || {};
         const policy = car.Policy || {}; // ✅ ดึง Policy จาก Car แทน
-        const garage = claim.Garage || {};
+        const garage = claim.Garage?.User || {};
         const insuranceUser = claim.Insurance?.User || {};
 
         // Flatten Data ตามที่ Frontend 'c' คาดหวัง
@@ -906,7 +912,7 @@ router.get('/detail/:id', async (req, res) => {
             incidentDate: claim.incidentDate,
             location: claim.location,
             detail: claim.detail,
-            state: status.state || 'open_case',
+            state: status.state,
             priority: status.urgentRepair ? 'urgent' : 'normal',
 
             // Timeline Dates
@@ -916,6 +922,7 @@ router.get('/detail/:id', async (req, res) => {
             garageSelectedDate: status.garageSelectedDate,
             repairStartDate: status.repairDate,
             completedDate: status.completedDate,
+            currentStep: status.currentStep,
 
             // Costs
             estimatedCost: claim.estimateCost || 0,
@@ -935,9 +942,12 @@ router.get('/detail/:id', async (req, res) => {
             coverageAmount: policy.coverageAmount,
 
             // Garage
-            garageName: garage.name,
-            garagePhone: garage.phone,
+            garageName: garage.firstName,
+            garagePhone: garage.phoneNumber,
             garageEmail: garage.email,
+            garageAddress: garage.address,
+            googleMapsUrl: garage.googleMapsUrl,
+            photoURL: garage.photoURL,
 
             // Officer
             insuranceFirstName: insuranceUser.firstName,
@@ -969,6 +979,11 @@ router.get('/full-detail/:id', async (req, res) => {
                 {
                     model: Car,
                     include: [{ model: Policy }]
+                },
+                {
+                    model: ChooseGarageRequest,
+                    where: { garageStatus: 'pending' },
+                    required: false
                 }
             ]
         });
@@ -977,14 +992,13 @@ router.get('/full-detail/:id', async (req, res) => {
 
         // ดึงวงเงินประกัน
         const policy = claim.Car?.Policy || {};
-        const insuranceBalance = policy.coverageAmount || 25000; // ค่าสมมติถ้าไม่มีข้อมูล
+        const insuranceBalance = policy.coverageAmount; // ค่าสมมติถ้าไม่มีข้อมูล
 
         res.json({
             photos: claim.AccidentPhotos || [],
             repairItems: claim.RepairItems || [],
             claim: {
                 insuranceBalance: insuranceBalance,
-                priorityLevel: 'normal' // ค่า default
             }
         });
     } catch (error) {
