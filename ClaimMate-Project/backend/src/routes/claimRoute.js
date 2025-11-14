@@ -23,6 +23,7 @@ const { Op } = require('sequelize');
 // 2. ⭐️ (แก้ไข) Import Middlewares และ Utils ให้ถูกต้อง
 const upload = require('../middlewares/upload'); // ⭐️ (แก้ไข) ไม่มี {}
 const { uploadImage, deleteFromCloudinary } = require('../utils/uploadToCloudinary'); // ⭐️ (แก้ไข) import ทั้ง 2 function
+const authenticate = require('../middlewares/authenticate');
 
 // 3. (คงไว้) Route เดิม (Active Claims)
 /**
@@ -1051,6 +1052,166 @@ router.post('/:id/accept-extra-cost', async (req, res) => {
     }
 });
 
+// -----------------------------------------------------------------
+// ⭐️ 12. (Route ใหม่) ดึงรายการ Urgent Requests (สำหรับหน้า Approvals)
+// -----------------------------------------------------------------
+/**
+ * @route   GET /api/claims/urgent-requests/pending
+ * @desc    (NEW) ดึง Urgent Requests ที่รอ Insurance อนุมัติ
+ * @access  Private (Insurance)
+ */
+router.get('/urgent-requests/pending', authenticate, async (req, res) => {
+
+    // (authenticate middleware จะใส่ req.insuranceId มาให้)
+    if (!req.insuranceId) {
+        return res.status(403).json({ message: 'Access denied' });
+    }
+
+    try {
+        const pendingRequests = await UrgentRequest.findAll({
+            where: {
+                approvalStatus: 'pending',
+                approver: 'insurance' // ⬅️ ดึงเฉพาะที่รอ Insurance
+            },
+            include: [
+                {
+                    model: Claim,
+                    where: { insuranceId: req.insuranceId }, // ⬅️ กรองเคสของ Insurance นี้
+                    required: true, // (INNER JOIN)
+                    attributes: ['id'],
+                    include: [
+                        {
+                            model: Customer,
+                            attributes: ['id'],
+                            include: [{ model: User, attributes: ['firstName', 'lastName'] }]
+                        },
+                        {
+                            model: Car,
+                            attributes: ['licensePlate']
+                        }
+                    ]
+                }
+            ],
+            order: [['createdAt', 'ASC']] // เรียงคำขอเก่าสุดขึ้นก่อน
+        });
+
+        // Map ข้อมูลให้ตรงกับ Mockup ของ Frontend (Approvals.jsx)
+        const formattedRequests = pendingRequests.map(req => {
+            const customerName = req.Claim?.Customer?.User
+                ? `${req.Claim.Customer.User.firstName} ${req.Claim.Customer.User.lastName}`
+                : 'N/A';
+
+            return {
+                id: req.id, // (UrgentRequest ID)
+                claimNumber: `CLM-${req.Claim.id}`,
+                customerName: customerName,
+                licensePlate: req.Claim?.Car?.licensePlate || 'N/A',
+                requestType: 'ขอซ่อมด่วน', // (มาจาก UrgentRequest)
+                date: req.createdAt // (วันที่สร้างคำขอ)
+            };
+        });
+
+        res.status(200).json(formattedRequests);
+
+    } catch (error) {
+        console.error('Error fetching pending urgent requests:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// -----------------------------------------------------------------
+// ⭐️ 13. (Route ใหม่) ดึงรายละเอียด Urgent Request (สำหรับ Modal)
+// -----------------------------------------------------------------
+/**
+ * @route   GET /api/claims/urgent-requests/:id
+ * @desc    (NEW) ดึงข้อมูล Urgent Request ชิ้นเดียวสำหรับ Modal
+ * @access  Private (Insurance)
+ */
+router.get('/urgent-requests/:id', authenticate, async (req, res) => {
+    try {
+        const request = await UrgentRequest.findByPk(req.params.id, {
+            include: [{
+                model: Claim,
+                attributes: ['id', 'incidentDate'],
+                include: [
+                    { model: Car, attributes: ['brand', 'model', 'licensePlate'] },
+                    { model: Customer, include: [{ model: User, attributes: ['firstName', 'lastName'] }] }
+                ]
+            }]
+        });
+
+        if (!request) {
+            return res.status(404).json({ message: 'Request not found' });
+        }
+
+        // Map ข้อมูลให้ตรงกับที่ Modal ใน Frontend ต้องการ
+        const customerName = request.Claim?.Customer?.User
+            ? `${request.Claim.Customer.User.firstName} ${request.Claim.Customer.User.lastName}`
+            : 'N/A';
+
+        res.status(200).json({
+            // (ข้อมูลสำหรับแสดงใน Modal)
+            id: request.id,
+            claimNumber: `CLM-${request.Claim.id}`,
+            customerName: customerName,
+            licensePlate: request.Claim?.Car?.licensePlate || 'N/A',
+            carModel: `${request.Claim?.Car?.brand || ''} ${request.Claim?.Car?.model || ''}`.trim(),
+            incidentDate: request.Claim.incidentDate,
+
+            requestType: 'ขอซ่อมด่วน',
+            details: request.reason, // ⬅️ "รายละเอียด" ที่ User กรอก
+            imageUrl: request.fileURL // ⬅️ "รูปภาพ" จาก Cloudinary
+        });
+
+    } catch (error) {
+        console.error('Error fetching urgent request details:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+
+// -----------------------------------------------------------------
+// ⭐️ 14. (Route ใหม่) อนุมัติ หรือ ปฏิเสธ Urgent Request
+// -----------------------------------------------------------------
+/**
+ * @route   PUT /api/claims/urgent-requests/:id/decide
+ * @desc    (NEW) อนุมัติ (ส่งต่ออู่) หรือ ปฏิเสธ คำขอซ่อมด่วน
+ * @access  Private (Insurance)
+ */
+router.put('/urgent-requests/:id/decide', authenticate, async (req, res) => {
+    const { action } = req.body; // รับ 'approve' หรือ 'reject'
+    const { id } = req.params;
+
+    try {
+        const request = await UrgentRequest.findByPk(id);
+        if (!request) {
+            return res.status(404).json({ message: 'Request not found' });
+        }
+
+        if (action === 'approve') {
+            // "อนุมัติ" (ส่งต่อให้ Garage)
+            await request.update({
+                approver: 'garage', // ⬅️ เปลี่ยนผู้อนุมัติคนถัดไป
+                approvalStatus: 'pending' // ⬅️ สถานะยังเป็น pending (แต่เป็น pending ที่อู่)
+            });
+            res.status(200).json({ message: 'Request approved and forwarded to garage' });
+
+        } else if (action === 'reject') {
+            // "ปฏิเสธ"
+            await request.update({
+                approvalStatus: 'rejected' // ⬅️ เปลี่ยนสถานะ
+            });
+            res.status(200).json({ message: 'Request rejected' });
+
+        } else {
+            return res.status(400).json({ message: 'Invalid action' });
+        }
+
+    } catch (error) {
+        console.error('Error deciding urgent request:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
 
 module.exports = router;
