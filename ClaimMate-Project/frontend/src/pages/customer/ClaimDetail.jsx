@@ -116,7 +116,7 @@ const ClaimDetail = () => {
       // ⭐️ 4. แปลง 'rawPhotos' (จาก DB) ให้เป็น 'images' (ที่ UI ใช้)
       const images = rawPhotos.map(p => ({
         id: p._id,
-        url: p.photoURL, // ⭐️Backend ส่งมาเป็น photoURL
+        url: p.photoUrl, // ⭐️Backend ส่งมาเป็น photoURL
         caption: p.caption || '',
         type: p.type || 'damage'
       }));
@@ -124,7 +124,7 @@ const ClaimDetail = () => {
       // ⭐️ 5. แปลง 'rawRepairItems' (จาก DB) ให้เป็น 'items' (ที่ UI ใช้)
       const items = rawRepairItems.map(item => ({
         id: item._id,
-        name: item.type, // ⭐️ Backend เก็บชื่อรายการซ่อมไว้ใน field 'type'
+        name: item.itemName, // ⭐️ Backend เก็บชื่อรายการซ่อมไว้ใน field 'type'
         cost: item.cost || 0
       }));
 
