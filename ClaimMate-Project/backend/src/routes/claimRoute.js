@@ -734,7 +734,11 @@ router.get('/customer/:customerId', async (req, res) => {
                 },
                 {
                     model: Car,
-                    attributes: ['brand', 'model', 'year', 'licensePlate']
+                    attributes: ['brand', 'model', 'year', 'licensePlate'],
+                    include: [{
+                        model: Policy,
+                        attributes: ['level']
+                    }]
                 },
 
                  /*   model: Garage, // เพิ่ม Garage เพื่อให้ Frontend แสดงชื่ออู่ได้

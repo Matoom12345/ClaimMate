@@ -17,8 +17,16 @@ const UrgentRequest = sequelize.define('UrgentRequest', {
         defaultValue: 'pending',
         allowNull: false,
     },
+    approver: {
+        type: DataTypes.ENUM('insurance', 'garage'),
+        defaultValue: 'insurance',
+        allowNull: false,
+    },
     approvalDate: {
         type: DataTypes.DATE,
+    },
+    type: {
+        type: DataTypes.STRING,
     },
     detail: {
         type: DataTypes.TEXT,

@@ -57,7 +57,7 @@ const CustomerDashboard = () => {
 
                 return {
                     id: claim.id,
-                    claimNumber: `CLM-${claim.id}`,
+                    claimNumber: `ประกันชั้น ${claim.Car?.Policy?.level || 'N/A'}`,
                     title: `CLM-${claim.id}`, // อาจจะเปลี่ยนเป็น claim.Car?.brand + ' ' + claim.Car?.model ก็ได้เพื่อให้สื่อความหมาย
                     date: claim.incidentDate,
                     currentStep: latest.currentStep || 1,
