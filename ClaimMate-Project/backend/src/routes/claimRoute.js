@@ -462,7 +462,8 @@ router.post('/save/:id', upload.none(), async (req, res) => {
                 // (ทำตามคำขอ: state: 'survey', currentStep: 2)
                 await ClaimStatus.update({
                     inspectionDate: inspectionDateTime,
-                    status: 'survey', // ⬅️ (ตามคำขอ)
+                    status: 'submit', // ⬅️ (ตามคำขอ)
+                    state: 'survey',
                     currentStep: 2,     // ⬅️ (ตามคำขอ)
                 }, { where: { claimId: id }, transaction: t });
 
@@ -480,9 +481,16 @@ router.post('/save/:id', upload.none(), async (req, res) => {
                 // ⭐️ 1.2 (ไม่เกินวงเงิน) -> อนุมัติเลย
                 await ClaimStatus.update({
                     inspectionDate: inspectionDateTime,
-                    status: 'approved', // ⬅️ (ตามคำขอ) อนุมัติ
+                    status: 'submit', // ⬅️ (ตามคำขอ) อนุมัติ
+                    state: 'approved',
                     currentStep: 3,     // ⬅️ (ตามคำขอ) ไป Step 3
+                    //approvedCost: totalCost,
                 }, { where: { claimId: id }, transaction: t });
+
+                await Claim.update(
+                    { approvedCost: totalCost },
+                    { where: { id: id }, transaction: t }
+                );
 
                 // ⭐️ อัปเดต RepairItem.approved = true ทั้งหมด
                 await RepairItem.update(

@@ -511,56 +511,7 @@ const CreateClaim = () => {
 
                 {/* RIGHT SIDEBAR */}
                 <div className="space-y-6">
-                  {customerFound && currentStep === 3 && (
-                      <div className="card-static">
-                        <h3 className="font-semibold mb-4 flex items-center gap-2">
-                          <span className="material-icons-round text-primary-500">flag</span>
-                          ระดับความเร่งด่วน
-                        </h3>
 
-                        <div className="space-y-2">
-                          {priorityOptions.map((option) => (
-                              <label
-                                  key={option.value}
-                                  className={`
-                      flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all
-                      ${formData.priority === option.value
-                                      ? "border-primary-500 bg-primary-50"
-                                      : "border-neutral-200 hover:border-primary-300"
-                                  }
-                    `}
-                              >
-                                <input
-                                    type="radio"
-                                    name="priority"
-                                    value={option.value}
-                                    checked={formData.priority === option.value}
-                                    onChange={handleChange}
-                                    className="sr-only"
-                                />
-
-                                <span
-                                    className={`material-icons-round ${formData.priority === option.value
-                                        ? "text-primary-600"
-                                        : "text-neutral-400"
-                                    }`}
-                                >
-                          {option.icon}
-                        </span>
-
-                                <span
-                                    className={`flex-1 font-medium text-sm ${formData.priority === option.value
-                                        ? "text-primary-700"
-                                        : "text-neutral-700"
-                                    }`}
-                                >
-                          {option.label}
-                        </span>
-                              </label>
-                          ))}
-                        </div>
-                      </div>
-                  )}
 
                   {/* INFO BOX */}
                   <div className="card bg-gradient-primary text-white">
