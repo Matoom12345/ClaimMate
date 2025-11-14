@@ -15,6 +15,7 @@ const {
     AdditionalSurvey,
     Satisfaction,
     Garage,
+    UrgentRequest,
     ChooseGarageRequest,
     sequelize
 } = require('../models');
@@ -1212,6 +1213,144 @@ router.put('/urgent-requests/:id/decide', authenticate, async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
+router.get('/customer/:customerId/repair-claims', async (req, res) => {
+    const { customerId } = req.params;
+
+    if (!customerId) {
+        return res.status(400).json({ success: false, message: 'Customer ID is required' });
+    }
+
+    try {
+        // 1. ดึงเคลมของลูกค้า
+        const claims = await Claim.findAll({
+            where: { customerId: customerId },
+            attributes: ['id', 'carId'], // เอา carId มาเพื่อ join Car
+            include: [
+                {
+                    // 2. (ตามคำสั่ง) ต้องมีสถานะ "กำลังซ่อม" (currentStep = 4)
+                    model: ClaimStatus,
+                    where: { currentStep: 4 }, // ⬅️ (ตามคำสั่ง)
+                    required: true
+                },
+                {
+                    // 3. (ตามคำสั่ง) ต้อง "ยังไม่เคย" ขอ UrgentRequest
+                    model: UrgentRequest,
+                    required: false, // ⬅️ (LEFT JOIN)
+                    attributes: ['id']
+                },
+                {
+                    // 4. (Optional) เอาป้ายทะเบียนมาแสดง
+                    model: Car,
+                    attributes: ['licensePlate'],
+                    required: true
+                }
+            ]
+        });
+
+        // 5. กรองเฉพาะ "ยังไม่เคย" (claim.UrgentRequest === null)
+        const eligibleClaims = claims.filter(claim => !claim.UrgentRequest);
+
+        // 6. Map ข้อมูลให้ Frontend (ตามที่ UrgentRequest.jsx ต้องการ)
+        const formattedClaims = eligibleClaims.map(claim => {
+            const claimNumber = `CLM-${claim.id}`;
+            const licensePlate = claim.Car?.licensePlate || 'N/A';
+            return {
+                claimNumber: claimNumber,
+                display: `${claimNumber} (${licensePlate})` // ⬅️ (Frontend จะใช้ field นี้)
+            };
+        });
+
+        res.status(200).json({ success: true, claims: formattedClaims });
+
+    } catch (error) {
+        console.error('Error fetching repair-claims:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+});
+
+
+// 12. ⭐️ (Route ใหม่ - สำหรับ Submit Urgent Request) ⭐️
+/**
+ * @route   POST /api/claims/urgent-request
+ * @desc    (NEW) ลูกค้ายื่นคำขอซ่อมด่วน
+ * @access  Private (Customer)
+ */
+// ⭐️ (แก้ไข) ใช้ upload.single('file') ตามที่ frontend <FileUpload name="file"> ส่งมา
+router.post('/urgent-request', upload.single('file'), async (req, res) => {
+    // 1. ดึงข้อมูลจาก body และ file
+    const { claimNumber, type, detail } = req.body; // 'type' คือ 'reason' จาก frontend
+
+    if (!req.file) {
+        // (Frontend validate ไว้แล้ว แต่กันเหนียว)
+        return res.status(400).json({ success: false, message: 'File is required' });
+    }
+    if (!claimNumber || !type || !detail) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+        // 2. แปลง claimNumber (CLM-123) -> claimId (123)
+        const claimId = parseInt(claimNumber.replace('CLM-', ''), 10);
+        if (isNaN(claimId)) {
+            return res.status(400).json({ success: false, message: 'Invalid claimNumber format' });
+        }
+
+        // 3. (ตามคำสั่ง) ตรวจสอบว่าเคยขอไปแล้วหรือยัง
+        const existingRequest = await UrgentRequest.findOne({
+            where: { claimId: claimId }
+        });
+
+        if (existingRequest) {
+            // ⭐️ (ส่ง Error code 11000 ตามที่ frontend คาดหวัง)
+            return res.status(400).json({
+                success: false,
+                message: 'คุณได้ส่งคำขอสำหรับใบเคลมนี้ไปแล้ว',
+                code: 11000 // ⬅️
+            });
+        }
+
+        // 4. (ตามคำสั่ง) อัปโหลดไฟล์ขึ้น Cloudinary
+        const folderPath = `claims/CLM-${claimId}/urgent_request`;
+        const result = await uploadImage(req.file.buffer, folderPath);
+        const fileUrl = result.secure_url;
+
+        // 5. (ตามคำสั่ง) บันทึกข้อมูลลง DB
+        await UrgentRequest.create({
+            claimId: claimId,
+            type: type,         // ⬅️ (reason จาก front)
+            detail: detail,     // ⬅️ (description จาก front)
+            fileUrl: fileUrl,   // ⬅️ (จาก Cloudinary)
+            requestDate: new Date(),
+            approvalStatus: 'pending' // (default)
+        }, { transaction: t });
+
+        // 6. Commit
+        await t.commit();
+
+        // 7. (ตามคำสั่ง) ส่ง success กลับ
+        res.status(201).json({ success: true, message: 'Urgent request submitted successfully' });
+
+    } catch (error) {
+        await t.rollback();
+        console.error('Error submitting urgent request:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Server error during urgent request submission'
+        });
+    }
+});
+
+
+/**
+ * @route   GET /api/claims/customer/:customerId
+ * @desc    ดึงรายการเคลมทั้งหมดของลูกค้าคนหนึ่ง
+ * @access  Private (Customer)
+ */
+// ... (โค้ดเดิมของ /customer/:customerId, /customer/:customerId/stats, /detail/:id, /full-detail/:id, /:id/accept-extra-cost) ...
 
 
 module.exports = router;
+
+
