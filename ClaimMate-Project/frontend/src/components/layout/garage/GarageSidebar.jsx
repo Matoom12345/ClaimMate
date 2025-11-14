@@ -23,7 +23,7 @@ const GarageSidebar = ({ collapsed = false }) => {
 
         // ยิง API เดิม
         const response = await axios.get(
-          'http://localhost:8000/api/garage/pending-requests',
+          'http://localhost:3000/api/garage/pending-requests',
           {
             headers: {
               Authorization: `Bearer ${token}`,
