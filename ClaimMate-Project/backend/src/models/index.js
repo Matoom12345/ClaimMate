@@ -51,8 +51,8 @@ User.hasOne(Garage, { foreignKey: 'userId', onDelete: 'CASCADE' });
 Garage.belongsTo(User, { foreignKey: 'userId' });
 
 // Car <-> Policy (One-to-One)
-//Car.hasOne(Policy, { foreignKey: 'carId', onDelete: 'CASCADE' });
-//Policy.belongsTo(Car, { foreignKey: 'carId' });
+Car.hasOne(Policy, { foreignKey: 'carId', onDelete: 'CASCADE' });
+Policy.belongsTo(Car, { foreignKey: 'carId' });
 
 // Claim <-> ClaimStatus (One-to-One)
 Claim.hasOne(ClaimStatus, { foreignKey: 'claimId', onDelete: 'CASCADE' });

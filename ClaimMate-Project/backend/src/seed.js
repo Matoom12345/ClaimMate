@@ -14,10 +14,10 @@ async function seedDatabase() {
     console.log('🌱 Starting seeding process (Strictly following models)...');
 
     try {
-        
+
         await db.sequelize.sync({ force: true });
         console.log('🔄 Database synced! (Dropped old data)');
-        
+
         // --- 1. สร้างพนักงานบริษัทประกัน (Insurance Staff) 3 คน ---
         console.log('👤 Creating Insurance Staff (as per User.js & Insurance.js)...');
 
@@ -170,7 +170,7 @@ async function seedDatabase() {
             googleMapsUrl: null, photoURL: null
         });
 
-        
+
         // --- 3. สร้างลูกค้า (Customers) 8 คน, รถ (Cars) และ กรมธรรม์ (Policies) ---
         console.log('👥 Creating 8 Customers, Cars, and Policies...');
 
@@ -266,7 +266,7 @@ async function seedDatabase() {
         console.log('Creating C4: ปิติ (5 cars)...');
         let userC4 = await db.User.create({
             role: 'customer', firstName: 'ปิติ', lastName: 'ยินดี',
-            email: 'piti@email.com', phoneNumber: '0844444444'
+            email: 'dheerawat.w@gmail.com', phoneNumber: '0844444444'
         });
         const customerC4 = await db.Customer.create({
             userId: userC4.id, citizenId: '4444444444444'
@@ -378,7 +378,7 @@ async function seedDatabase() {
         console.log('Creating C8: เอก (2 cars, 1 completed claim)...');
         let userC8 = await db.User.create({
             role: 'customer', firstName: 'เอก', lastName: 'ใจดี',
-            email: 'dheerawat.w@gmail.com', phoneNumber: '0888888888'
+            email: 'aek@email.com', phoneNumber: '0888888888'
         });
         const customerC8 = await db.Customer.create({
             userId: userC8.id, citizenId: '8888888888888'
@@ -456,7 +456,7 @@ async function seedDatabase() {
             carId: carC7_1.id,          // เคลมรถ Pajero
             insuranceId: staff2.id,     // อารยา (Staff2) เป็นคนรับเคส
             garageId: garage2.id,       // ซ่อมที่อู่ เจริญพงษ์ (Garage2)
-            incidentDate: getDate(2024, 10, 5, 18, 0), 
+            incidentDate: getDate(2024, 10, 5, 18, 0),
             location: 'ลานจอดรถห้างสรรพสินค้า',
             detail: 'ถอยชนเสา กระจกมองข้างแตก',
             estimateCost: 8000.0,
@@ -491,7 +491,7 @@ async function seedDatabase() {
             carId: carC8_2.id,          // เคลมรถ Altis
             insuranceId: staff3.id,     // วิชัย (Staff3) เป็นคนรับเคส
             garageId: garage3.id,       // ซ่อมที่อู่ ส รุ่งโรจน์ (Garage3)
-            incidentDate: getDate(2025, 1, 15, 8, 15), 
+            incidentDate: getDate(2025, 1, 15, 8, 15),
             location: 'ถนนวิภาวดีรังสิต',
             detail: 'มอเตอร์ไซค์เฉี่ยวประตูหลังซ้ายเป็นรอยยาว',
             estimateCost: 10000.0,
@@ -500,43 +500,16 @@ async function seedDatabase() {
         });
         await db.ClaimStatus.create({
             claimId: claim3.id,
-            state: 'open_case',
-            status: 'in_progress',
-            currentStep:3,
+            state: 'completed',
+            status: 'new',
+            currentStep: 6,
             reportedDate: getDate(2025, 1, 15, 8, 30),
             inspectionDate: getDate(2025, 1, 16, 9, 0),
             approvalDate: getDate(2025, 1, 16, 13, 0),
             garageSelectedDate: getDate(2025, 1, 17, 10, 0),
             repairDate: getDate(2025, 1, 20, 9, 0),
             completedDate: getDate(2025, 1, 25, 17, 0),
-            isClosed: false
-        });
-        // เคสที่ 4: ของ เอก (C8) - กำลังดำเนินการ
-        const claim4 = await db.Claim.create({
-            customerId: customerC8.id,
-            carId: carC8_1.id, // ใช้รถอีกคันของเอก
-            insuranceId: staff1.id, // พนักงานคนไหนก็ได้
-            garageId: garage1.id,
-            incidentDate: getDate(2025, 11, 1, 8, 30),
-            location: 'ถนนพหลโยธิน',
-            detail: 'เฉี่ยวด้านหน้าเล็กน้อย',
-            estimateCost: 12000.0,
-            additionalCost: 0,
-            approvedCost: 0 // ยังไม่อนุมัติ
-        });
-
-        await db.ClaimStatus.create({
-            claimId: claim4.id,
-            state: 'open_case',
-            status: 'in_progress', // ✅ ใช้สถานะนี้เพื่อให้ Dashboard จับได้
-            currentStep: 3,
-            reportedDate: getDate(2025, 11, 1, 9, 0),
-            inspectionDate: getDate(2025, 11, 2, 10, 0),
-            approvalDate: null,
-            garageSelectedDate: null,
-            repairDate: null,
-            completedDate: null,
-            isClosed: false
+            isClosed: true
         });
         await db.AccidentPhoto.create({
             claimId: claim3.id, type: 'damage',
@@ -562,7 +535,7 @@ async function seedDatabase() {
         console.error('❌ Error seeding database:', error);
     } finally {
         console.log('Database connection closed.');
-        await db.sequelize.close(); 
+        await db.sequelize.close();
     }
 }
 
