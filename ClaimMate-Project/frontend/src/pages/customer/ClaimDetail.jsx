@@ -161,6 +161,7 @@ const ClaimDetail = () => {
     console.log('Inspecting claim object:', claim);
     if (!claim) return null;
 
+    const isPending = claim.ChooseGarageRequests && claim.ChooseGarageRequests.length > 0;
     // ⭐️ (1) ดึง currentStep (ตัวเลข) ออกมาจาก ClaimStatus
     const step = claim.currentStep;
     const garage = claim.garage;
@@ -168,6 +169,11 @@ const ClaimDetail = () => {
     // (ถ้ายังไม่มีข้อมูล claim หรือ step ก็ไม่ต้องแสดงอะไรเลย)
     if (!step) {
       return { show: false };
+    }
+
+    // ⭐️ 2. (เพิ่ม) ถ้า pending, ให้แสดง "รออู่ตรวจสอบ"
+    if (isPending) {
+      return { show: true, type: 'pending', message: 'รออู่ตรวจสอบ' };
     }
 
     // ⭐️ (2) ขั้นตอนที่ไม่ควรแสดงอู่: 1 (เปิดเคส), 2 (สำรวจ)
@@ -653,6 +659,15 @@ const ClaimDetail = () => {
                 </div>
               )}
 
+              {garageDisplay.type === 'pending' && (
+                <div className="text-center py-4">
+                  <p className="text-warning font-medium">{garageDisplay.message}</p>
+                  <p className="text-sm text-neutral-500 mt-1">
+                    ระบบได้ส่งคำขอไปยังอู่แล้ว
+                  </p>
+                </div>
+              )}
+
               {garageDisplay.type === 'info' && (
                 <>
                   <div className="space-y-3">
@@ -741,7 +756,7 @@ const ClaimDetail = () => {
 
             <div className="space-y-2">
               {/* ✅ (8) แก้ไข: ปุ่มเลือกอู่ซ่อม (แสดงเมื่อ step 3 หรือ 4 และยังไม่มีอู่) */}
-              {(claim.currentStep === 3 || claim.currentStep === 4) && !claim.garage && (
+              {(claim.currentStep === 3 || claim.currentStep === 4) && !claim.garage && !(claim.ChooseGarageRequests && claim.ChooseGarageRequests.length > 0) && (
                 <Link
                   // ⭐️ (9) แก้ไข: Link ควรอ้างอิงด้วย claim.id (PK)
                   to={`/customer/select-garage/${claim.id}`}

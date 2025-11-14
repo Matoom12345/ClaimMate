@@ -90,9 +90,9 @@ const CustomerDashboard = () => {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="text-center">
-          <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">
-            refresh
-          </span>
+                    <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">
+                        refresh
+                    </span>
                     <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
                 </div>
             </div>
@@ -153,15 +153,15 @@ const CustomerDashboard = () => {
                             การเคลมที่กำลังดำเนินการ
                         </h2>
                         <span className="text-sm text-neutral-500">
-              {activeClaims.length} รายการ
-            </span>
+                            {activeClaims.length} รายการ
+                        </span>
                     </div>
 
                     {activeClaims.length === 0 ? (
                         <div className="card text-center py-12">
-              <span className="material-icons-round text-6xl text-neutral-300 mb-4">
-                inbox
-              </span>
+                            <span className="material-icons-round text-6xl text-neutral-300 mb-4">
+                                inbox
+                            </span>
                             <p className="text-neutral-500 mb-4">
                                 คุณไม่มีการเคลมที่กำลังดำเนินการ
                             </p>
@@ -183,28 +183,28 @@ const CustomerDashboard = () => {
                                                 {claim.title}
                                             </h3>
                                             <span className="badge badge-primary">
-                        {claim.claimNumber}
-                      </span>
+                                                {claim.claimNumber}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-4 text-sm text-neutral-500">
-                      <span className="flex items-center gap-1">
-                        <span className="material-icons-round text-sm">
-                          calendar_today
-                        </span>
-                          {claim.date}
-                      </span>
+                                            <span className="flex items-center gap-1">
+                                                <span className="material-icons-round text-sm">
+                                                    calendar_today
+                                                </span>
+                                                {claim.date}
+                                            </span>
 
                                             <span className="flex items-center gap-1">
-                        <span className="material-icons-round text-sm">
-                          directions_car
-                        </span>
+                                                <span className="material-icons-round text-sm">
+                                                    directions_car
+                                                </span>
                                                 {claim.carBrand + " " + claim.carModel + " (" + claim.carYear + ")"}
-                      </span>
+                                            </span>
 
                                             <span className="flex items-center gap-1">
-                        <span className="material-icons-round text-sm">pin</span>
+                                                <span className="material-icons-round text-sm">pin</span>
                                                 {claim.licensePlate}
-                      </span>
+                                            </span>
                                         </div>
                                     </div>
                                     <Link
@@ -213,8 +213,8 @@ const CustomerDashboard = () => {
                                     >
                                         <span>ดูรายละเอียด</span>
                                         <span className="material-icons-round text-sm">
-                      arrow_forward
-                    </span>
+                                            arrow_forward
+                                        </span>
                                     </Link>
                                 </div>
 
@@ -224,8 +224,8 @@ const CustomerDashboard = () => {
                                         <p className="text-xs text-neutral-500 mb-1">ค่าซ่อมประเมิน</p>
                                         <p className="text-lg font-semibold text-primary-600">
                                             ฿{claim.estimatedCost.toLocaleString() || (
-                                            <span className="text-warning">รอการประเมิน</span>
-                                        )}
+                                                <span className="text-warning">รอการประเมิน</span>
+                                            )}
                                         </p>
                                     </div>
 
@@ -233,20 +233,25 @@ const CustomerDashboard = () => {
                                         <p className="text-xs text-neutral-500 mb-1">อู่ซ่อม</p>
                                         <p className="font-medium text-neutral-dark">
                                             {(() => {
-                                                // ถ้ายังไม่ถึงขั้น "เลือกอู่ซ่อม" แสดง "-"
-                                                const stepsBeforeGarageSelection = ['reported', 'inspected', 'approved'];
-                                                if (stepsBeforeGarageSelection.includes(claim.currentStep)) {
-                                                    return <span className="text-neutral-400">-</span>;
+
+                                                const garageName = claim.Garage?.garageName;
+                                                const claimState = claim.ClaimStatus?.state;
+
+                                                const isPending = claim.ChooseGarageRequests && claim.ChooseGarageRequests.length > 0;
+
+                                                // 1. ถ้ามี "คำขอ pending" -> ให้แสดง "รออู่ตรวจสอบ"
+                                                if (isPending) {
+                                                    return <span className="text-warning">รออู่ตรวจสอบ</span>;
+                                                }
+
+                                                // 2. ถ้ามี "ชื่ออู่" แล้ว (คืออู่รับงานแล้ว) -> ให้แสดงชื่ออู่
+                                                if (garageName) {
+                                                  return garageName; 
                                                 }
 
                                                 // ถ้าถึงขั้น "เลือกอู่ซ่อม" แต่ยังไม่เลือก
-                                                if (claim.currentStep === 3 && !claim.garage) {
+                                                if (claimState === 'approved' || claimState === 'choose_garage' && !garageName) {
                                                     return <span className="text-warning">กรุณาเลือกอู่ซ่อม</span>;
-                                                }
-
-                                                // ถ้ามีอู่แล้ว (เลือกและยืนยันแล้ว)
-                                                if (claim.garage) {
-                                                    return claim.garage.name || claim.garage;
                                                 }
 
                                                 // default
@@ -296,16 +301,16 @@ const CustomerDashboard = () => {
                                     </p>
                                 </div>
                                 <span className="material-icons-round text-neutral-400">
-                  chevron_right
-                </span>
+                                    chevron_right
+                                </span>
                             </Link>
                         </div>
                     </div>
 
                     <div className="card bg-gradient-secondary text-white">
-            <span className="material-icons-round text-4xl mb-3">
-              support_agent
-            </span>
+                        <span className="material-icons-round text-4xl mb-3">
+                            support_agent
+                        </span>
                         <h3 className="font-semibold mb-2">ต้องการความช่วยเหลือ?</h3>
                         <p className="text-sm text-white/80 mb-4">
                             ติดต่อศูนย์บริการลูกค้าของเรา
