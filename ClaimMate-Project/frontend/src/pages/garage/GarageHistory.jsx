@@ -1,98 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Card, CardBody, StatusBadge } from '../../components';
+import axios from 'axios';
+import { Card, CardBody, Badge, Button, Modal } from '../../components';
+import { format } from 'date-fns';
 
-/**
- * GarageHistory - หน้าประวัติงานซ่อมที่เสร็จสิ้น/ปิดเคสแล้ว
- * * TODO: Backend Integration
- * - GET /api/garage/history?status={status}&search={keyword} - ดึงรายการงานซ่อม
- */
 const GarageHistory = () => {
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [repairs, setRepairs] = useState([]);
-  const [filteredRepairs, setFilteredRepairs] = useState([]);
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClaim, setSelectedClaim] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const statusFilters = [
-    { value: 'all', label: 'ทั้งหมด' },
-    { value: 'completed', label: 'เสร็จสิ้น' },
-    { value: 'rejected', label: 'ถูกปฏิเสธ' },
-  ];
+  // Status config
+  const statusConfig = {
+    completed: { label: 'เสร็จสิ้น', color: 'success', icon: 'task_alt' }
+  };
 
+  const getStatusBadge = (status) => {
+    const config = statusConfig[status] || { label: status, color: 'neutral', icon: 'info' };
+    return (
+      <Badge variant={config.color} icon={config.icon} size="sm">
+        {config.label}
+      </Badge>
+    );
+  };
+
+  // ✅ โหลดประวัติ
   useEffect(() => {
-    // TODO: Backend - ดึงประวัติงานซ่อม
-    
-    // Mock data
-    setTimeout(() => {
-      const mockRepairs = [
-        {
-          id: 'R-2024-005',
-          claimId: 'CLM-2024-005',
-          customerName: 'นายสุชาติ รวยดี',
-          carModel: 'Ford Ranger 2022',
-          licensePlate: 'จจ 4321 กรุงเทพฯ',
-          status: 'completed',
-          startDate: '2024-08-10',
-          completionDate: '2024-08-18',
-          totalCost: 32000,
-          approvedAmount: 32000,
-        },
-        {
-          id: 'R-2024-006',
-          claimId: 'CLM-2024-006',
-          customerName: 'นายเจริญ พัฒนา',
-          carModel: 'Toyota Fortuner',
-          licensePlate: 'จจ 1111 กรุงเทพ',
-          status: 'rejected',
-          startDate: '2024-09-01',
-          completionDate: '2024-09-02', // วันที่ถูกปฏิเสธ
-          totalCost: 80000,
-          approvedAmount: 0,
-        },
-        {
-          id: 'R-2024-007',
-          claimId: 'CLM-2024-007',
-          customerName: 'นางสาววิภา สุขใจ',
-          carModel: 'Honda Civic 2021',
-          licensePlate: 'ฮค 5678 กรุงเทพฯ',
-          status: 'completed',
-          startDate: '2024-10-24',
-          completionDate: '2024-10-30',
-          totalCost: 36000,
-          approvedAmount: 36000,
-        },
-      ];
-
-      setRepairs(mockRepairs);
-      setFilteredRepairs(mockRepairs);
-      setLoading(false);
-    }, 500);
+    fetchHistory();
   }, []);
 
-  // Filter และ Search Logic
-  useEffect(() => {
-    let result = repairs;
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/garages/history', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    if (selectedStatus !== 'all') {
-      result = result.filter(repair => repair.status === selectedStatus);
+      if (response.data.success) {
+        setHistory(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      alert('ไม่สามารถโหลดประวัติได้');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (searchTerm) {
-      result = result.filter(repair =>
-        repair.claimId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        repair.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        repair.carModel.toLowerCase().includes(searchTerm.toLowerCase())
+  // ✅ ดูรายละเอียด
+  const handleViewDetail = async (claim) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `http://localhost:3000/api/garages/repairs/R-${claim.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      if (response.data.success) {
+        setSelectedClaim(response.data.data);
+        setShowDetailModal(true);
+      }
+    } catch (error) {
+      console.error('Error fetching detail:', error);
+      alert('ไม่สามารถโหลดรายละเอียดได้');
     }
-
-    setFilteredRepairs(result);
-  }, [selectedStatus, searchTerm, repairs]);
-
-  // Count repairs by status
-  const getStatusCount = (status) => {
-    if (status === 'all') return repairs.length;
-    return repairs.filter(repair => repair.status === status).length;
   };
 
   if (loading) {
@@ -114,125 +85,209 @@ const GarageHistory = () => {
           ประวัติการซ่อม
         </h1>
         <p className="text-neutral-500">
-          รายการงานซ่อมที่เสร็จสิ้นหรือปิดไปแล้ว ({repairs.length} รายการ)
+          งานซ่อมที่เสร็จสิ้นแล้วทั้งหมด ({history.length} รายการ)
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="card-static">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="ค้นหาด้วยเลขงานซ่อม, ชื่อลูกค้า, รุ่นรถ..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field pl-12"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex gap-2 overflow-x-auto">
-            {statusFilters.map(filter => (
-              <button
-                key={filter.value}
-                onClick={() => setSelectedStatus(filter.value)}
-                className={`
-                  px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300
-                  ${selectedStatus === filter.value
-                    ? 'bg-primary-500 text-white shadow-button'
-                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                  }
-                `}
-              >
-                {filter.label}
-                <span className="ml-2 opacity-75">
-                  ({getStatusCount(filter.value)})
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Claims Table (ใช้ Table เพื่อความเป็นระเบียบ) */}
-      {filteredRepairs.length === 0 ? (
+      {/* Empty State */}
+      {history.length === 0 ? (
         <div className="card-static text-center py-16">
           <span className="material-icons-round text-6xl text-neutral-300 mb-4">
-            search_off
+            history
           </span>
           <p className="text-neutral-500 text-lg mb-2">
-            ไม่พบประวัติงานซ่อม
+            ยังไม่มีประวัติการซ่อม
           </p>
           <p className="text-neutral-400 text-sm">
-            ลองเปลี่ยนคำค้นหาหรือตัวกรอง
+            เมื่อมีงานซ่อมเสร็จสิ้น รายการจะปรากฏที่นี่
           </p>
         </div>
       ) : (
-        <div className="card-static overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">เลขงานซ่อม</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">รถยนต์</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">ลูกค้า</th>
-                <th className="text-left py-3 px-4 font-semibold text-neutral-700">วันที่เสร็จสิ้น</th>
-                <th className="text-right py-3 px-4 font-semibold text-neutral-700">ยอดเงิน</th>
-                <th className="text-center py-3 px-4 font-semibold text-neutral-700">สถานะ</th>
-                <th className="text-center py-3 px-4 font-semibold text-neutral-700">การดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRepairs.map(repair => (
-                <tr key={repair.id} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors duration-200">
-                  <td className="py-4 px-4">
-                    <p className="font-semibold text-neutral-dark">{repair.id}</p>
-                    <p className="text-xs text-neutral-500">เคส: {repair.claimId}</p>
-                  </td>
-                  <td className="py-4 px-4">
-                    <p className="font-medium text-neutral-dark">{repair.carModel}</p>
-                    <p className="text-xs text-neutral-500">{repair.licensePlate}</p>
-                  </td>
-                  <td className="py-4 px-4 text-sm text-neutral-600">
-                    {repair.customerName}
-                  </td>
-                  <td className="py-4 px-4 text-sm text-neutral-600">
-                    {repair.completionDate}
-                  </td>
-                  <td className="py-4 px-4 text-right">
-                    <p className="font-semibold text-neutral-dark">
-                      ฿{repair.totalCost.toLocaleString()}
-                    </p>
-                    {repair.approvedAmount > 0 && repair.approvedAmount !== repair.totalCost && (
-                       <p className="text-xs text-warning">
-                          (อนุมัติ ฿{repair.approvedAmount.toLocaleString()})
-                       </p>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <StatusBadge status={repair.status} size="sm" />
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <Link
-                      to={`/garage/history/${repair.id}`}
-                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
-                    >
-                      <span className="material-icons-round text-sm">visibility</span>
-                      <span>ดูรายละเอียด</span>
-                    </Link>
-                  </td>
+        <div className="card-static overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-neutral-50 border-b border-neutral-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    รหัสงาน
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    ลูกค้า
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    รถยนต์
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    วันที่เสร็จสิ้น
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    ยอดรวม
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    สถานะ
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    การดำเนินการ
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-neutral-200">
+                {history.map((claim) => (
+                  <tr key={claim.id} className="hover:bg-neutral-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-neutral-900">
+                        R-{claim.id}
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        CLM-{claim.id}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-neutral-900">
+                        {claim.Customer?.User?.firstName} {claim.Customer?.User?.lastName}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-neutral-900">
+                        {claim.Car?.brand} {claim.Car?.model}
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        {claim.Car?.licensePlate}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                      {claim.ClaimStatus?.completedDate
+                        ? format(new Date(claim.ClaimStatus.completedDate), 'dd/MM/yyyy')
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-primary-600">
+                        ฿{(claim.approvedCost || claim.estimateCost || 0).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge('completed')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => handleViewDetail(claim)}
+                        className="text-primary-600 hover:text-primary-800 font-medium text-sm"
+                      >
+                        ดูรายละเอียด
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      {/* Modal: รายละเอียดงานซ่อม */}
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedClaim(null);
+        }}
+        title="รายละเอียดงานซ่อม"
+        size="lg"
+      >
+        {selectedClaim ? (
+          <div className="space-y-4">
+            {/* ข้อมูลหลัก */}
+            <div className="grid grid-cols-2 gap-4 p-4 bg-neutral-50 rounded-lg">
+              <div>
+                <p className="text-xs text-neutral-500">รหัสงาน</p>
+                <p className="font-medium text-neutral-dark">{selectedClaim.id}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500">เคส</p>
+                <p className="font-medium text-neutral-dark">{selectedClaim.claimId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500">ลูกค้า</p>
+                <p className="font-medium text-neutral-dark">{selectedClaim.customerName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500">รถยนต์</p>
+                <p className="font-medium text-neutral-dark">{selectedClaim.carModel}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500">ทะเบียน</p>
+                <p className="font-medium text-neutral-dark">{selectedClaim.licensePlate}</p>
+              </div>
+              <div>
+                <p className="text-xs text-neutral-500">วันที่เสร็จสิ้น</p>
+                <p className="font-medium text-neutral-dark">
+                  {selectedClaim.startDate
+                    ? format(new Date(selectedClaim.startDate), 'dd/MM/yyyy')
+                    : '-'}
+                </p>
+              </div>
+            </div>
+
+            {/* รายการซ่อม */}
+            <div className="card-static">
+              <h4 className="font-semibold text-neutral-dark mb-3 flex items-center gap-2">
+                <span className="material-icons-round text-primary-500">build</span>
+                รายการซ่อมทั้งหมด ({selectedClaim.items?.length || 0})
+              </h4>
+              <div className="space-y-2">
+                {selectedClaim.items && selectedClaim.items.length > 0 ? (
+                  selectedClaim.items.map((item, index) => (
+                    <div key={item.id} className="flex justify-between items-center p-3 bg-neutral-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="material-icons-round text-success text-lg">
+                          check_circle
+                        </span>
+                        <div>
+                          <p className="text-xs text-neutral-500">รายการที่ {index + 1}</p>
+                          <p className="font-medium text-neutral-dark">{item.label}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary-600">
+                          ฿{item.cost.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-neutral-500 text-center py-4">ไม่มีรายการซ่อม</p>
+                )}
+
+                {/* ยอดรวม */}
+                {selectedClaim.items && selectedClaim.items.length > 0 && (
+                  <div className="flex justify-between items-center p-4 bg-primary-50 rounded-lg font-semibold border-t-2 border-primary-200 mt-3">
+                    <span className="text-primary-700">ยอดรวมทั้งหมด</span>
+                    <span className="text-xl text-primary-700">
+                      ฿{selectedClaim.items.reduce((sum, item) => sum + item.cost, 0).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* หมายเหตุ */}
+            {selectedClaim.notes && (
+              <div className="p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+                <p className="text-sm text-neutral-700">
+                  <span className="font-semibold">หมายเหตุ:</span> {selectedClaim.notes}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <span className="material-icons-round animate-spin text-4xl text-primary-500 mb-4">
+              refresh
+            </span>
+            <p className="text-neutral-500">กำลังโหลด...</p>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

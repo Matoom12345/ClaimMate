@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Card, CardBody, StatusBadge, Button, Modal, Input, TextArea, Select, Badge } from '../../components';
 
 /**
@@ -11,13 +12,11 @@ import { Card, CardBody, StatusBadge, Button, Modal, Input, TextArea, Select, Ba
  * 4. ปุ่มแจ้งงานซ่อมเสร็จสิ้น (เปลี่ยนสถานะเป็น completed)
  */
 const GarageRepairDetail = () => {
-  const { id } = useParams(); // id คือ R-2024-xxx
+  const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [repair, setRepair] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
   
   // State สำหรับ Modal ขออนุมัติเพิ่มเติม
   const [newApproval, setNewApproval] = useState({
@@ -25,54 +24,66 @@ const GarageRepairDetail = () => {
     items: [{ id: 1, label: '', cost: '' }],
   });
 
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+
   const statusOptions = [
-    { value: 'pending', label: 'รอดำเนินการ', icon: 'radio_button_unchecked' },
     { value: 'in_progress', label: 'กำลังดำเนินการ', icon: 'autorenew' },
     { value: 'completed', label: 'เสร็จสิ้น', icon: 'check_circle' },
   ];
 
   // TODO: Backend - ดึงรายละเอียดงานซ่อม
+  // ✅ โหลดข้อมูล
   useEffect(() => {
-    // Mock data based on R-2024-001 from GarageRepairs.jsx
-    setTimeout(() => {
-      setRepair({
-        id: id,
-        claimId: 'CLM-2024-008',
-        customerName: 'นายสมชาย ใจดี',
-        phone: '081-234-5678',
-        carModel: 'Toyota Camry 2020',
-        licensePlate: 'กข 1234 กรุงเทพฯ',
-        currentStatus: 'repairing',
-        progress: 65,
-        startDate: '2024-10-25',
-        estimatedCompletion: '2024-10-28',
-        totalEstimate: 45000,
-        approvedAmount: 45000,
-        items: [
-          { id: 1, label: 'เปลี่ยนกันชนหน้า', status: 'completed', cost: 15000 },
-          { id: 2, label: 'ซ่อม/เปลี่ยนฝากระโปรงหน้า', status: 'in_progress', cost: 12000 },
-          { id: 3, label: 'พ่นสีด้านหน้า', status: 'pending', cost: 18000 },
-          { id: 4, label: 'เปลี่ยนโลโก้ใหม่', status: 'pending', cost: 2000, isAdditional: true },
-        ],
-        notes: 'ลูกค้าต้องการรับรถวันที่ 28 ต.ค.',
-      });
-      setLoading(false);
-    }, 500);
+    fetchRepairDetail();
   }, [id]);
 
-  // Handle individual item status update
-  const handleItemStatusChange = (itemId, newStatus) => {
-    // TODO: Backend - POST /api/garage/repairs/{id}/items/{itemId}/status
+  const fetchRepairDetail = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:3000/api/garages/repairs/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setRepair(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching repair detail:', error);
+      alert('ไม่สามารถโหลดข้อมูลได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+ 
+
+  // ✅ อัปเดตสถานะรายการซ่อม
+  const handleItemStatusChange = async (itemId, newStatus) => {
     setIsUpdatingStatus(true);
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `http://localhost:3000/api/garages/repairs/${id}/items/${itemId}`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+
+      // อัปเดต UI
       setRepair(prev => ({
         ...prev,
         items: prev.items.map(item =>
           item.id === itemId ? { ...item, status: newStatus } : item
         ),
       }));
+
+      alert('✅ อัปเดตสถานะสำเร็จ');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+    } finally {
       setIsUpdatingStatus(false);
-    }, 500);
+    }
   };
   
   // Handle Additional Item Form
@@ -121,14 +132,26 @@ const GarageRepairDetail = () => {
   };
 
   // Handle complete repair
-  const handleCompleteRepair = () => {
-    // TODO: Backend - PUT /api/garage/repairs/{id}/status (to 'completed')
-    setShowCompleteModal(false);
-    alert('✅ งานซ่อมเสร็จสิ้น! ลูกค้าจะได้รับการแจ้งเตือน');
-    // Navigate back to history
-    navigate('/garage/history');
-  };
+const handleCompleteRepair = async () => {
+    try {
+        const token = localStorage.getItem('token');
+        const claimIdNum = repair.claimId.replace('CLM-', ''); // 🔥 ตัด prefix
 
+        await axios.post(
+            'http://localhost:3000/api/garages/complete-repair',
+            { claimId: claimIdNum },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setShowCompleteModal(false);
+        alert('✅ งานซ่อมเสร็จสิ้น! ลูกค้าจะได้รับการแจ้งเตือน');
+        navigate('/garage/repairs');  // 🔥 กลับไปหน้ารายการซ่อม
+
+    } catch (error) {
+        console.error('Error completing repair:', error);
+        alert('เกิดข้อผิดพลาดในการปิดงาน');
+    }
+};
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -136,6 +159,15 @@ const GarageRepairDetail = () => {
           <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">refresh</span>
           <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
         </div>
+      </div>
+    );
+  }
+
+    if (!repair) {
+    return (
+      <div className="text-center py-12">
+        <span className="material-icons-round text-6xl text-neutral-300 mb-4">error_outline</span>
+        <p className="text-neutral-500">ไม่พบข้อมูลงานซ่อม</p>
       </div>
     );
   }
@@ -199,10 +231,6 @@ const GarageRepairDetail = () => {
                     <div>
                         <p className="text-xs text-neutral-500 mb-1">เริ่มซ่อม</p>
                         <p className="font-medium text-neutral-dark">{repair.startDate}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-neutral-500 mb-1">คาดว่าเสร็จ</p>
-                        <p className="font-medium text-neutral-dark">{repair.estimatedCompletion}</p>
                     </div>
                 </div>
             </div>
@@ -437,7 +465,7 @@ const GarageRepairDetail = () => {
         footer={
           <>
             <Button variant="outline" onClick={() => setShowCompleteModal(false)}>ยกเลิก</Button>
-            <Button variant="success" icon="task_alt" onClick={handleCompleteRepair}>ยืนยันเสร็จสิ้น</Button>
+            <Button variant="primary" icon="task_alt" onClick={handleCompleteRepair}>ยืนยันเสร็จสิ้น</Button>
           </>
         }
       >

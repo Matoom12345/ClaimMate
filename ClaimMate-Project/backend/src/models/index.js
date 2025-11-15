@@ -35,7 +35,7 @@ const db = {
     ChooseGarageRequest,
     Policy,
     ClaimStatus,
-    Satisfaction
+    Satisfaction,
 };
 
 // 3. กำหนดความสัมพันธ์ (Associations) ตาม ERD

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardBody, Badge, Button, Modal, Select } from '../../components';
 
 /**
@@ -19,105 +20,23 @@ import { Card, CardHeader, CardTitle, CardBody, Badge, Button, Modal, Select } f
  * 5. POST /api/garage/repairs/:id/reject - ปฏิเสธงาน
  */
 const GarageRepairs = () => {
-  const [selectedRepair, setSelectedRepair] = useState(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showAcceptModal, setShowAcceptModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [newStatus, setNewStatus] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [repairs, setRepairs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedRepair, setSelectedRepair] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // TODO: Backend - Replace with real API call
-  const repairs = [
-    {
-      id: 'R-2024-001',
-      claimId: 'CLM-2024-008',
-      customerName: 'นายสมชาย ใจดี',
-      phone: '081-234-5678',
-      carModel: 'Toyota Camry 2020',
-      licensePlate: 'กข 1234 กรุงเทพฯ',
-      status: 'repairing',
-      progress: 65,
-      startDate: '2024-10-25',
-      estimatedCompletion: '2024-10-28',
-      items: [
-        { code: 'bumper_front', label: 'เปลี่ยนกันชนหน้า', status: 'completed' },
-        { code: 'hood', label: 'ซ่อม/เปลี่ยนฝากระโปรงหน้า', status: 'in_progress' },
-        { code: 'paint_front', label: 'พ่นสีด้านหน้า', status: 'pending' },
-      ],
-      notes: 'ลูกค้าต้องการรับรถวันที่ 28 ต.ค.',
-    },
-    {
-      id: 'R-2024-002',
-      claimId: 'CLM-2024-007',
-      customerName: 'นางสาววิภา สุขใจ',
-      phone: '089-876-5432',
-      carModel: 'Honda Civic 2021',
-      licensePlate: 'ฮค 5678 กรุงเทพฯ',
-      status: 'parts_ordered',
-      progress: 30,
-      startDate: '2024-10-24',
-      estimatedCompletion: '2024-10-30',
-      items: [
-        { code: 'door_rear_left', label: 'ซ่อมประตูหลังซ้าย', status: 'pending' },
-        { code: 'paint_left', label: 'พ่นสีด้านซ้าย', status: 'pending' },
-      ],
-      notes: 'รออะไหล่ ประตู ETA: 29 ต.ค.',
-    },
-    {
-      id: 'R-2024-003',
-      claimId: 'CLM-2024-006',
-      customerName: 'นายประเสริฐ มั่งมี',
-      phone: '092-345-6789',
-      carModel: 'Mazda CX-5 2019',
-      licensePlate: 'งง 9876 กรุงเทพฯ',
-      status: 'waiting_approval',
-      progress: 10,
-      startDate: '2024-10-26',
-      estimatedCompletion: '2024-10-29',
-      items: [
-        { code: 'headlight', label: 'เปลี่ยนไฟหน้า', status: 'pending' },
-        { code: 'fender_right', label: 'ซ่อมบังโคลนขวา', status: 'pending' },
-      ],
-      notes: 'รอบริษัทอนุมัติรายการเพิ่มเติม',
-      needsApproval: true,
-    },
-    {
-      id: 'R-2024-004',
-      claimId: 'CLM-2024-005',
-      customerName: 'นายสุชาติ รวยดี',
-      phone: '098-765-4321',
-      carModel: 'Ford Ranger 2022',
-      licensePlate: 'จจ 4321 กรุงเทพฯ',
-      status: 'quality_check',
-      progress: 95,
-      startDate: '2024-10-22',
-      estimatedCompletion: '2024-10-27',
-      items: [
-        { code: 'bumper_rear', label: 'เปลี่ยนกันชนหลัง', status: 'completed' },
-        { code: 'taillight', label: 'เปลี่ยนไฟท้าย', status: 'completed' },
-        { code: 'paint_rear', label: 'พ่นสีด้านหลัง', status: 'completed' },
-      ],
-      notes: 'พร้อมส่งมอบ',
-    },
-  ];
-
-  // Status options สำหรับการเปลี่ยนสถานะ
   const statusOptions = [
-    { value: 'waiting_approval', label: 'รออนุมัติ', icon: 'pending' },
-    { value: 'parts_ordered', label: 'สั่งอะไหล่แล้ว', icon: 'inventory_2' },
-    { value: 'repairing', label: 'กำลังซ่อม', icon: 'build' },
-    { value: 'quality_check', label: 'ตรวจสอบคุณภาพ', icon: 'verified' },
-    { value: 'completed', label: 'เสร็จสิ้น', icon: 'task_alt' },
+    { value: 'in_progress', label: 'กำลังดำเนินการ' },
+    { value: 'completed', label: 'เสร็จสิ้น' },
   ];
+  
 
-  // Status config สำหรับแสดงสถานะ
+  // Status config
   const statusConfig = {
-    waiting_approval: { label: 'รออนุมัติ', color: 'warning', icon: 'pending' },
-    parts_ordered: { label: 'สั่งอะไหล่แล้ว', color: 'info', icon: 'inventory_2' },
-    repairing: { label: 'กำลังซ่อม', color: 'primary', icon: 'build' },
-    quality_check: { label: 'ตรวจสอบคุณภาพ', color: 'secondary', icon: 'verified' },
+    in_progress: { label: 'กำลังซ่อม', color: 'primary', icon: 'build' },
     completed: { label: 'เสร็จสิ้น', color: 'success', icon: 'task_alt' },
   };
 
@@ -130,6 +49,29 @@ const GarageRepairs = () => {
     );
   };
 
+  useEffect(() => {
+    fetchRepairs();
+  }, []);
+
+  const fetchRepairs = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/garages/repairs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setRepairs(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching repairs:', error);
+      alert('ไม่สามารถโหลดรายการซ่อมได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateStatus = async () => {
     if (!newStatus) {
       alert('กรุณาเลือกสถานะใหม่');
@@ -137,10 +79,10 @@ const GarageRepairs = () => {
     }
 
     setIsUpdating(true);
-    
+
     // TODO: Backend - PUT /api/garage/repairs/:id/status
     console.log('Updating status:', selectedRepair.id, 'to', newStatus);
-    
+
     // Simulate API call
     setTimeout(() => {
       setIsUpdating(false);
@@ -152,9 +94,20 @@ const GarageRepairs = () => {
   };
 
   // Filter repairs by status
-  const filteredRepairs = filterStatus === 'all' 
-    ? repairs 
+  const filteredRepairs = filterStatus === 'all'
+    ? repairs
     : repairs.filter(r => r.status === filterStatus);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <span className="material-icons-round animate-spin text-6xl text-primary-500 mb-4">refresh</span>
+          <p className="text-neutral-500">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -175,37 +128,26 @@ const GarageRepairs = () => {
         <CardBody className="py-3">
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-sm text-neutral-600 font-medium">กรองตามสถานะ:</span>
-            <button 
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filterStatus === 'all' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
+            <button
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'all' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                }`}
               onClick={() => setFilterStatus('all')}
             >
               ทั้งหมด ({repairs.length})
             </button>
-            <button 
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filterStatus === 'repairing' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
-              onClick={() => setFilterStatus('repairing')}
+            <button
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'in_progress' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                }`}
+              onClick={() => setFilterStatus('in_progress')}
             >
-              กำลังซ่อม ({repairs.filter(r => r.status === 'repairing').length})
+              กำลังซ่อม ({repairs.filter(r => r.status === 'in_progress').length})
             </button>
-            <button 
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filterStatus === 'parts_ordered' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
-              onClick={() => setFilterStatus('parts_ordered')}
+            <button
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'completed' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                }`}
+              onClick={() => setFilterStatus('completed')}
             >
-              สั่งอะไหล่แล้ว ({repairs.filter(r => r.status === 'parts_ordered').length})
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filterStatus === 'quality_check' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
-              onClick={() => setFilterStatus('quality_check')}
-            >
-              ตรวจสอบคุณภาพ ({repairs.filter(r => r.status === 'quality_check').length})
+              ซ่อมเสร็จสิ้น ({repairs.filter(r => r.status === 'completed').length})
             </button>
           </div>
         </CardBody>
@@ -257,8 +199,8 @@ const GarageRepairs = () => {
                       เคส: {repair.claimId}
                     </p>
                     <p className="text-xs text-neutral-500">
-                      เริ่ม: {new Date(repair.startDate).toLocaleDateString('th-TH', { 
-                        day: 'numeric', 
+                      เริ่ม: {new Date(repair.startDate).toLocaleDateString('th-TH', {
+                        day: 'numeric',
                         month: 'short'
                       })}
                     </p>
@@ -275,11 +217,11 @@ const GarageRepairs = () => {
                       <div key={index} className="flex items-center gap-2 text-sm">
                         <span className={`
                           material-icons-round text-sm
-                          ${item.status === 'completed' ? 'text-success' : 
+                          ${item.status === 'completed' ? 'text-success' :
                             item.status === 'in_progress' ? 'text-primary-500' : 'text-neutral-400'}
                         `}>
-                          {item.status === 'completed' ? 'check_circle' : 
-                           item.status === 'in_progress' ? 'autorenew' : 'radio_button_unchecked'}
+                          {item.status === 'completed' ? 'check_circle' :
+                            item.status === 'in_progress' ? 'autorenew' : 'radio_button_unchecked'}
                         </span>
                         <span className={`
                           ${item.status === 'completed' ? 'line-through text-neutral-400' : 'text-neutral-600'}
@@ -300,40 +242,21 @@ const GarageRepairs = () => {
                   </div>
                 )}
 
-                {/* Estimated Completion */}
-                <div className="mb-4 flex items-center gap-2 text-sm text-neutral-500">
-                  <span className="material-icons-round text-sm">schedule</span>
-                  <span>
-                    คาดว่าเสร็จ: {new Date(repair.estimatedCompletion).toLocaleDateString('th-TH', { 
-                      day: 'numeric', 
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-4 border-t border-neutral-200">
                   <Link
                     to={`/garage/repairs/${repair.id}`}
-                    className="flex-1 btn-outline flex items-center justify-center gap-2"
-                  >
-                    <span className="material-icons-round">visibility</span>
-                    ดูรายละเอียด
+                    className="flex-1 flex items-center justify-center gap-2">
+                    <Button
+                      variant="primary"
+                      className="flex-1"
+                      icon="sync"
+                      onClick={() => {
+                        setSelectedRepair(repair);
+                        setNewStatus(repair.status);
+                        setShowStatusModal(true);
+                      }}>อัพเดตสถานะ</Button>
                   </Link>
-                  <Button
-                    variant="primary"
-                    className="flex-1"
-                    icon="sync"
-                    onClick={() => {
-                      setSelectedRepair(repair);
-                      setNewStatus(repair.status);
-                      setShowStatusModal(true);
-                    }}
-                  >
-                    อัพเดตสถานะ
-                  </Button>
-                </div>
               </CardBody>
             </Card>
           ))
