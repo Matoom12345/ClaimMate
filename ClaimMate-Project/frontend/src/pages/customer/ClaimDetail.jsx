@@ -152,9 +152,6 @@ const ClaimDetail = () => {
     setShowImageModal(true);
   };
 
-  const handleDownloadPDF = () => {
-    console.log("Generate PDF Later", id);
-  };
 
   // ✅ ข้อ 2: ตรวจสอบว่าควรแสดงอะไรในส่วนอู่ซ่อม
   const getGarageDisplay = () => {
@@ -322,14 +319,6 @@ const ClaimDetail = () => {
             <StatusBadge status={claim.status} />
           </div>
         </div>
-
-        <button
-          onClick={handleDownloadPDF}
-          className="btn-primary flex items-center gap-2"
-        >
-          <span className="material-icons-round">download</span>
-          <span>ดาวน์โหลด PDF</span>
-        </button>
       </div>
 
       {/* ⭐️ (ลบ) Card "อนุมัติเคลมไม่สำเร็จ" ขนาดใหญ่ออกจากตรงนี้ */}

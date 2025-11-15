@@ -123,19 +123,7 @@ const ClaimList = () => {
     setFilteredClaims(result);
   }, [selectedStatus, searchTerm, claims]);
 
-  // TODO: Backend - ดาวน์โหลด PDF
-  const handleDownloadPDF = (claimId) => {
-    console.log('Download PDF for claim:', claimId);
-    // fetch(`/api/customer/claims/${claimId}/pdf`)
-    //   .then(response => response.blob())
-    //   .then(blob => {
-    //     const url = window.URL.createObjectURL(blob);
-    //     const a = document.createElement('a');
-    //     a.href = url;
-    //     a.download = `claim-${claimId}.pdf`;
-    //     a.click();
-    //   });
-  };
+
 
   // Count claims by status
   const getStatusCount = (status) => {
@@ -286,13 +274,6 @@ const ClaimList = () => {
                     <span className="material-icons-round text-sm">visibility</span>
                     <span>ดูรายละเอียด</span>
                   </Link>
-                  <button
-                    onClick={() => handleDownloadPDF(claim.id)}
-                    className="btn-outline flex items-center gap-2 whitespace-nowrap"
-                  >
-                    <span className="material-icons-round text-sm">download</span>
-                    <span>ดาวน์โหลด PDF</span>
-                  </button>
                 </div>
               </div>
             </div>

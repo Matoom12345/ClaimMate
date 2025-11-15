@@ -445,9 +445,6 @@ const ClaimDetail = () => {
     }
   }
 
-  const handleExportPDF = () => {
-    console.log('Export PDF for claim:', id);
-  };
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     navigate('/insurance');
@@ -512,10 +509,6 @@ const ClaimDetail = () => {
               )}
             </div>
           </div>
-          <button onClick={handleExportPDF} className="btn-outline flex items-center gap-2">
-            <span className="material-icons-round">download</span>
-            <span>Export PDF</span>
-          </button>
         </div>
 
         {/* Claim Info Summary (เหมือนเดิม) */}
@@ -867,7 +860,7 @@ const ClaimDetail = () => {
                   <div className="p-4 bg-blue-50 rounded-lg text-left mb-6">
                     <p className="text-sm text-neutral-700">
                       <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
-                      ลูกค้าสามารถดูรายละเอียดและดาวน์โหลดใบเคลม PDF ได้แล้ว
+                      ลูกค้าสามารถดูรายละเอียดได้แล้ว
                     </p>
                   </div>
                   <button onClick={handleCloseSuccessModal} className="btn-primary w-full">เข้าใจแล้ว</button>
