@@ -112,4 +112,10 @@ ChooseGarageRequest.belongsTo(Garage, { foreignKey: 'garageId' });
 Claim.hasMany(ClaimStatus, { foreignKey: 'claimId' });
 ClaimStatus.belongsTo(Claim, { foreignKey: 'claimId' });
 
+RepairItem.belongsTo(AdditionalApprove, { 
+    foreignKey: 'claimId',
+    targetKey: 'claimId',
+    as: 'AdditionalApprove'
+});
+
 module.exports = db;

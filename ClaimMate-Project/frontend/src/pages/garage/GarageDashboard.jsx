@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardBody, Badge, Button } from '../../components';
+import axios from 'axios';
+import { format } from 'date-fns';
 
 /**
  * GarageDashboard - หน้าภาพรวมสำหรับอู่ซ่อม
@@ -13,34 +15,33 @@ const GarageDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
 
-  useEffect(() => {
-    // TODO: Backend - ดึงข้อมูล dashboard
-    
-    // Mock data (อ้างอิงจาก mock ใน GarageSidebar)
-    setTimeout(() => {
-      setDashboardData({
-        stats: {
-          pendingClaims: 3, // รอยืนยัน
-          activeRepairs: 5, // กำลังซ่อม
-          approvalsPending: 2, // รออนุมัติเพิ่มเติม
-          completedToday: 3,
-        },
-        activeRepairsList: [
-          // ✅ (แก้ไข) ปรับสถานะสำหรับรายการติดตามให้ใช้ 'inprogress'
-          { id: 'R-2024-001', carModel: 'Toyota Camry 2020', licensePlate: 'กข 1234', progress: 65, estimatedCompletion: '2024-10-28', status: 'inprogress' },
-          // ✅ (แก้ไข) ปรับสถานะสำหรับรายการติดตามให้ใช้ 'inprogress'
-          { id: 'R-2024-002', carModel: 'Honda Civic 2021', licensePlate: 'ฮค 5678', progress: 30, estimatedCompletion: '2024-10-30', status: 'inprogress' },
-          // ✅ (เพิ่ม) สถานะ 'completed'
-          { id: 'R-2024-003', carModel: 'Mazda 3 2019', licensePlate: 'นก 4321', progress: 100, estimatedCompletion: '2024-10-24', status: 'completed' },
-        ],
-        recentApprovals: [
-          { id: 'APR-2024-001', claimId: 'CLM-2024-008', carModel: 'Toyota Camry 2020', type: 'pending' },
-          { id: 'APR-2024-002', claimId: 'CLM-2024-007', carModel: 'Honda Civic 2021', type: 'approved' },
-        ]
-      });
-      setLoading(false);
-    }, 500);
-  }, []);
+useEffect(() => {
+    // 1. สร้างฟังก์ชันสำหรับดึงข้อมูล
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        // 2. ยิง API ไปยัง Backend (เดี๋ยวเราจะไปแก้ Backend ให้ส่งข้อมูลนี้มา)
+        const response = await axios.get('http://localhost:3000/api/garages/dashboard', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        // 3. ถ้าสำเร็จ, นำข้อมูลจริง (response.data.data) มาใส่ State
+        if (response.data.success) {
+          setDashboardData(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        alert('ไม่สามารถโหลดข้อมูล Dashboard ได้');
+      } finally {
+        // 4. ไม่ว่าจะสำเร็จหรือล้มเหลว ก็ให้หยุดหมุน
+        setLoading(false);
+      }
+    };
+
+    // 5. เรียกใช้งานฟังก์ชัน
+    fetchDashboardData();
+  }, []); // ทำงานครั้งเดียวตอนเปิดหน้า
 
   const getStatusConfig = (status) => {
     const config = {
@@ -164,9 +165,9 @@ const GarageDashboard = () => {
                         <p className="font-medium text-neutral-dark line-clamp-1">{repair.carModel}</p>
                         <Badge variant={config.color} size="sm">{config.label}</Badge>
                     </div>
-                    <p className="text-sm text-neutral-500">ทะเบียน: {repair.licensePlate} • เสร็จ: {repair.estimatedCompletion}</p>
+                    <p className="text-sm text-neutral-500">ทะเบียน: {repair.licensePlate}</p>
                   </div>
-                  <span className="font-semibold text-primary-600">{repair.progress}%</span>
+          
                 </Link>
               );
             })}

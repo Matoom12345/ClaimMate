@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models');
-const { ChooseGarageRequest, Claim, Customer, Car, Garage, User } = require('../models');
+const { ChooseGarageRequest, Claim, Customer, Car, Garage, User, AdditionalApprove } = require('../models');
 const authenticate = require('../middlewares/authenticate');
 
 // ============================================
@@ -9,22 +9,30 @@ const authenticate = require('../middlewares/authenticate');
 // ============================================
 
 // 📊 GET /api/garage/dashboard - Dashboard stats
-router.get('/dashboard', async (req, res) => {
+// 📊 GET /api/garages/dashboard - Dashboard stats (ฉบับแก้ไข)
+router.get('/dashboard', authenticate, async (req, res) => {
     try {
-        // TODO: เพิ่ม authentication middleware
-        const garageId = req.query.garageId; // ชั่วคราว
+        // 1. หา Garage ID จาก User ที่ Login
+        const garage = await Garage.findOne({ where: { userId: req.user.id } });
+        if (!garage) {
+            return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลอู่ซ่อม' });
+        }
+        const garageId = garage.id;
 
-        // นับจำนวนเคสต่างๆ
+        // 2. นับจำนวนเคสต่างๆ
         const pendingCount = await db.ChooseGarageRequest.count({
             where: { garageId, garageStatus: 'pending' }
         });
 
+        // ⭐️⭐️⭐️ [FIX 1] ⭐️⭐️⭐️
+        // แก้ '$ClaimStatus.currentStatus$' กลับไปเป็น '$ClaimStatus.state$'
+        // และ 'in_progress' กลับไปเป็น 'repair' (ตามโค้ดเดิมของคุณ)
         const activeCount = await db.Claim.count({
             where: {
                 garageId,
-                '$ClaimStatus.state$': 'repair'
+                '$ClaimStatus.state$': 'repair' 
             },
-            include: [{ model: db.ClaimStatus }]
+            include: [{ model: db.ClaimStatus, attributes: [] }] 
         });
 
         const approvalsCount = await db.AdditionalApprove.count({
@@ -32,18 +40,75 @@ router.get('/dashboard', async (req, res) => {
                 approvalStatus: 'pending',
                 '$Claim.garageId$': garageId
             },
-            include: [{ model: db.Claim }]
+            include: [{ model: db.Claim, attributes: [] }] 
         });
 
+        // --- 3. ดึงรายการซ่อมที่กำลังทำ (Active Repairs) ---
+        
+        // ⭐️⭐️⭐️ [FIX 2] ⭐️⭐️⭐️ (แก้ที่ where)
+        const activeRepairsData = await db.Claim.findAll({
+            where: {
+                garageId: garage.id,
+                '$ClaimStatus.state$': 'repair' 
+            },
+            include: [
+                 // ⭐️ [FIX 3] (แก้ที่ attributes)
+                { model: db.ClaimStatus, attributes: ['state'] },
+                { model: db.Car, attributes: ['model', 'licensePlate'] }
+            ],
+            limit: 5, // เอาแค่ 5 รายการล่าสุด
+            order: [['updatedAt', 'DESC']]
+        });
+
+        // 4. แปลงข้อมูล
+        const activeRepairsList = activeRepairsData.map(claim => ({
+            id: claim.id,
+            carModel: claim.Car?.model || 'N/A',
+            licensePlate: claim.Car?.licensePlate || 'N/A',
+            // ⭐️⭐️⭐️ [FIX 4] ⭐️⭐️⭐️ (แก้ที่ claim.ClaimStatus.state)
+            status: claim.ClaimStatus?.state || 'repair',
+        }));
+
+        // --- 5. ดึงรายการอนุมัติล่าสุด (Recent Approvals) ---
+        const recentApprovalsData = await db.AdditionalApprove.findAll({
+            where: {
+                '$Claim.garageId$': garageId
+            },
+            include: [{
+                model: db.Claim,
+                attributes: ['id'],
+                include: [{ model: db.Car, attributes: ['model'] }]
+            }],
+            limit: 5,
+            order: [['createdAt', 'DESC']]
+        });
+        
+        // 6. แปลงข้อมูล
+        const recentApprovals = recentApprovalsData.map(appr => ({
+            id: appr.id,
+            carModel: appr.Claim?.Car?.model || 'N/A',
+            claimId: appr.claimId,
+            type: appr.approvalStatus // อันนี้ถูกต้องแล้ว (จาก Frontend)
+        }));
+
+
+        // 7. ส่งข้อมูลทั้งหมดกลับไป
         res.json({
             success: true,
-            stats: {
-                pendingClaims: pendingCount,
-                activeRepairs: activeCount,
-                approvalsPending: approvalsCount,
+            data: {
+                stats: {
+                    pendingClaims: pendingCount,
+                    activeRepairs: activeCount,
+                    approvalsPending: approvalsCount,
+                    completedToday: 0 // (Placeholder)
+                },
+                activeRepairsList: activeRepairsList,
+                recentApprovals: recentApprovals
             }
         });
+
     } catch (error) {
+        console.error('Error fetching dashboard:', error);
         res.status(500).json({
             success: false,
             message: error.message
@@ -145,7 +210,7 @@ router.post('/requests/:id/accept', authenticate, async (req, res) => {
             // 5.3 🔥 Update ClaimStatus (ตามที่คุณต้องการ)
             await db.ClaimStatus.update(
                 {
-                    state: 'choose_garage',     // 🔥 เปลี่ยน state
+                    state: 'repair',     // 🔥 เปลี่ยน state
                     currentStep: 4,             // 🔥 เปลี่ยน step
                     garageSelectedDate: new Date() // 🔥 บันทึกวันที่เลือกอู่
                 },
@@ -241,7 +306,7 @@ router.get('/repairs', authenticate, async (req, res) => {
                 {
                     model: db.ClaimStatus,
                     where: {
-                        state: 'choose_garage', // 🔥 เฉพาะงานที่รับแล้ว
+                        state: ['choose_garage', 'repair'], // 🔥 เฉพาะงานที่รับแล้ว
                         isClosed: false
                     },
                     required: true
@@ -349,7 +414,16 @@ router.get('/repairs/:id', authenticate, async (req, res) => {
                     model: Customer,
                     include: [{ model: User, attributes: ['firstName', 'lastName', 'phoneNumber'] }]
                 },
-                { model: db.RepairItem }
+                {
+                    model: db.RepairItem,
+                    // 🔥 เพิ่ม include AdditionalApprove เพื่อดึงสถานะการอนุมัติ
+                    include: [{
+                        model: db.AdditionalApprove,
+                        as: 'AdditionalApprove',
+                        required: false,
+                        attributes: ['approvalStatus']
+                    }]
+                }
             ]
         });
 
@@ -395,7 +469,9 @@ router.get('/repairs/:id', authenticate, async (req, res) => {
                 label: item.itemName,
                 status: item.status || 'in_progress',
                 cost: item.cost,
-                isAdditional: item.approved === false // ถ้ายังไม่ approved = รายการเพิ่มเติม
+                isAdditional: item.approved === false, // ถ้ายังไม่ approved = รายการเพิ่มเติม
+                approved: item.approved, // true/false
+                approvalStatus: item.AdditionalApprove?.approvalStatus || null // 'pending'/'approved'/'rejected'
             })),
             notes: repair.detail || ''
         };
@@ -451,34 +527,89 @@ router.put('/repairs/:id/items/:itemId', authenticate, async (req, res) => {
 });
 
 // 💰 POST /api/garage/request-additional - ขออนุมัติเพิ่ม
-router.post('/request-additional', async (req, res) => {
+// 💰 POST /api/garage/request-additional - ขออนุมัติเพิ่ม (แก้ไขแล้ว)
+router.post('/request-additional', authenticate, async (req, res) => {
+    const { claimId, items, reason } = req.body; // claimId มาจาก repair.claimId.replace('CLM-', '')
+    const userId = req.user.id;
+
+    // 1. ตรวจสอบสิทธิ์
+    const garage = await Garage.findOne({ where: { userId } });
+    if (!garage) {
+        return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์' });
+    }
+
+    // 2. ตรวจสอบว่าเป็นงานของอู่นี้จริง
+    const claim = await Claim.findOne({
+        where: { id: claimId, garageId: garage.id },
+        include: [
+            {
+                model: Car,
+                include: [{ model: db.Policy, attributes: ['remainingBalance'] }]
+            }
+        ]
+    });
+
+    if (!claim) {
+        return res.status(404).json({ success: false, message: 'ไม่พบเคสนี้' });
+    }
+
+    const t = await db.sequelize.transaction();
+
     try {
-        const { claimId, requestedAmount, items, note } = req.body;
+        // 3. คำนวณยอดรวม
+        const requestedAmount = items.reduce((sum, item) => sum + parseFloat(item.cost || 0), 0);
+        const currentCost = claim.estimateCost || 0;
+        const totalCost = currentCost + requestedAmount;
 
-        // สร้างคำขออนุมัติ
+        // 4. เช็ควงเงินคุ้มครอง
+        const remainingBalance = claim.Car?.Policy?.remainingBalance || 0;
+        const isWithinBudget = totalCost <= remainingBalance;
+
+        // 5. สร้าง AdditionalApprove
         const approval = await db.AdditionalApprove.create({
-            claimId,
-            requestedAmount,
-            note
-        });
+            claimId: claimId,
+            requestedAmount: requestedAmount,
+            approvalStatus: 'pending',
+            approvedAmount: 0,
+            requestDate: new Date(),
+            responseDate: null,
+        }, { transaction: t });
 
-        // เพิ่ม repair items ใหม่
-        if (items && items.length > 0) {
-            const repairItems = items.map(item => ({
-                claimId,
-                itemName: item.name,
-                cost: item.cost,
-                approved: false
-            }));
-            await db.RepairItem.bulkCreate(repairItems);
+        // 6. สร้าง RepairItem (approved = false หรือ true ตามวงเงิน)
+        const repairItems = items.map(item => ({
+            claimId: claimId,
+            itemName: item.label, // ⚠️ ตรงกับ frontend ที่ส่งมาเป็น { label, cost }
+            cost: parseFloat(item.cost || 0),
+            approved: false,
+            status: 'pending',
+            additionalApproveId: approval.id
+        }));
+        await db.RepairItem.bulkCreate(repairItems, { transaction: t });
+
+        // 7. ถ้าอนุมัติทันที → อัปเดต approvedCost
+        if (isWithinBudget) {
+            await Claim.update(
+                { approvedCost: totalCost },
+                { where: { id: claimId }, transaction: t }
+            );
         }
+
+        await t.commit();
 
         res.json({
             success: true,
-            message: 'ส่งคำขออนุมัติสำเร็จ',
-            data: approval
+            message: '✅ ส่งคำขออนุมัติไปยังบริษัทประกันภัยแล้ว (รอลูกค้าอนุมัติ)', // 🔥 แก้ message
+            data: {
+                approvalId: approval.id,
+                status: approval.approvalStatus,
+                requestedAmount: requestedAmount,
+                totalCost: totalCost
+            }
         });
+
     } catch (error) {
+        await t.rollback();
+        console.error('Error requesting additional approval:', error);
         res.status(500).json({
             success: false,
             message: error.message
@@ -505,13 +636,13 @@ router.get('/history', authenticate, async (req, res) => {
                     where: { state: 'completed', isClosed: true },
                     required: true
                 },
-                { 
+                {
                     model: Car,
                     attributes: ['brand', 'model', 'licensePlate']
                 },
-                { 
+                {
                     model: Customer,
-                    include: [{ 
+                    include: [{
                         model: User,
                         attributes: ['firstName', 'lastName']
                     }]
@@ -574,4 +705,168 @@ router.post('/complete-repair', authenticate, async (req, res) => {
     }
 });
 
+// ============================================
+// Urgent Request Routes (คำขอซ่อมด่วน)
+// ============================================
+
+// 🚨 GET /api/garage/urgent-requests
+router.get('/urgent-requests', authenticate, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const garage = await Garage.findOne({ where: { userId } });
+        
+        if (!garage) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'ไม่พบข้อมูลอู่' 
+            });
+        }
+
+        const urgentRequests = await db.UrgentRequest.findAll({
+            where: { approver: 'garage' },
+            include: [{
+                model: db.Claim,
+                where: { garageId: garage.id },
+                required: true,
+                include: [
+                    {
+                        model: Customer,
+                        include: [{ 
+                            model: User, 
+                            attributes: ['firstName', 'lastName', 'phoneNumber'] 
+                        }]
+                    },
+                    {
+                        model: Car,
+                        attributes: ['brand', 'model', 'year', 'licensePlate']
+                    }
+                ]
+            }],
+            order: [['requestDate', 'DESC']]
+        });
+
+        const formattedRequests = urgentRequests.map(request => {
+            const claim = request.Claim || {};
+            const customer = claim.Customer?.User || {};
+            const car = claim.Car || {};
+
+            return {
+                id: `URG-${request.id}`,
+                urgentRequestId: request.id,
+                claimId: `CLM-${claim.id}`,
+                customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+                customerPhone: customer.phoneNumber || '',
+                carModel: `${car.brand || ''} ${car.model || ''} ${car.year || ''}`.trim(),
+                licensePlate: car.licensePlate || '',
+                type: request.type || 'urgent_repair',
+                detail: request.detail || '',
+                status: request.approvalStatus,
+                requestDate: request.requestDate,
+                approvalDate: request.approvalDate,
+                fileUrl: request.fileUrl
+            };
+        });
+
+        res.json({
+            success: true,
+            data: formattedRequests
+        });
+
+    } catch (error) {
+        console.error('Error fetching urgent requests:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 🚨 POST /api/garage/urgent-requests/:id/approve
+router.post('/urgent-requests/:id/approve', authenticate, async (req, res) => {
+    try {
+        const requestId = req.params.id;
+        const userId = req.user.id;
+
+        const garage = await Garage.findOne({ where: { userId } });
+        if (!garage) {
+            return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์' });
+        }
+
+        const request = await db.UrgentRequest.findOne({
+            where: { id: requestId },
+            include: [{
+                model: db.Claim,
+                where: { garageId: garage.id },
+                required: true
+            }]
+        });
+
+        if (!request) {
+            return res.status(404).json({ success: false, message: 'ไม่พบคำขอนี้' });
+        }
+
+        if (request.approvalStatus !== 'pending') {
+            return res.status(400).json({ success: false, message: 'คำขอนี้ถูกดำเนินการแล้ว' });
+        }
+
+        await db.UrgentRequest.update({
+            approvalStatus: 'approved',
+            approvalDate: new Date()
+        }, { where: { id: requestId } });
+
+        res.json({
+            success: true,
+            message: 'อนุมัติคำขอซ่อมด่วนสำเร็จ'
+        });
+
+    } catch (error) {
+        console.error('Error approving urgent request:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 🚨 POST /api/garage/urgent-requests/:id/reject
+router.post('/urgent-requests/:id/reject', authenticate, async (req, res) => {
+    try {
+        const requestId = req.params.id;
+        const { reason } = req.body;
+        const userId = req.user.id;
+
+        const garage = await Garage.findOne({ where: { userId } });
+        if (!garage) {
+            return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์' });
+        }
+
+        const request = await db.UrgentRequest.findOne({
+            where: { id: requestId },
+            include: [{
+                model: db.Claim,
+                where: { garageId: garage.id },
+                required: true
+            }]
+        });
+
+        if (!request) {
+            return res.status(404).json({ success: false, message: 'ไม่พบคำขอนี้' });
+        }
+
+        if (request.approvalStatus !== 'pending') {
+            return res.status(400).json({ success: false, message: 'คำขอนี้ถูกดำเนินการแล้ว' });
+        }
+
+        await db.UrgentRequest.update({
+            approvalStatus: 'rejected',
+            approvalDate: new Date()
+        }, { where: { id: requestId } });
+
+        res.json({
+            success: true,
+            message: 'ปฏิเสธคำขอซ่อมด่วนสำเร็จ'
+        });
+
+    } catch (error) {
+        console.error('Error rejecting urgent request:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 module.exports = router;

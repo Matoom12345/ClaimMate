@@ -123,36 +123,6 @@ const GarageRepairs = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardBody className="py-3">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="text-sm text-neutral-600 font-medium">กรองตามสถานะ:</span>
-            <button
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'all' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                }`}
-              onClick={() => setFilterStatus('all')}
-            >
-              ทั้งหมด ({repairs.length})
-            </button>
-            <button
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'in_progress' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                }`}
-              onClick={() => setFilterStatus('in_progress')}
-            >
-              กำลังซ่อม ({repairs.filter(r => r.status === 'in_progress').length})
-            </button>
-            <button
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${filterStatus === 'completed' ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                }`}
-              onClick={() => setFilterStatus('completed')}
-            >
-              ซ่อมเสร็จสิ้น ({repairs.filter(r => r.status === 'completed').length})
-            </button>
-          </div>
-        </CardBody>
-      </Card>
-
       {/* Repairs List */}
       <div className="grid grid-cols-1 gap-6">
         {filteredRepairs.length === 0 ? (
