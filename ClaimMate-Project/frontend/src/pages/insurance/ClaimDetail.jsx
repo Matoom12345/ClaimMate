@@ -34,24 +34,22 @@ const REPAIR_ITEMS_OPTIONS = [
 ];
 
 const ClaimDetail = () => {
-  const { id } = useParams(); // id = claimNumber
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [claim, setClaim] = useState(null);
-
-  // รูปภาพทั้งหมดที่หน้า UI ใช้แสดง (รวมของเดิมจาก DB + ของใหม่ temp)
   const [images, setImages] = useState([]);
 
-  // ⭐️ แก้ไข: (ลบ isUploading ออกจากที่นี่ เพราะเราจะไม่อัปโหลดทันที)
-  // const isUploading = images.some(img => img.loading === true);
+  // ⭐️ 1. เพิ่ม State สำหรับ ReadOnly
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // ฟอร์มรายงาน
   const [reportData, setReportData] = useState({
     inspectionDate: new Date().toISOString().split('T')[0],
     inspectionTime: new Date().toTimeString().slice(0, 5),
     damageDescription: '',
-    repairItems: [], // [{ id, type, customDescription, cost, existing, _id? }]
+    repairItems: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -59,42 +57,43 @@ const ClaimDetail = () => {
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [submitType, setSubmitType] = useState('draft'); // 'draft' | 'submit'
-  const [showExceedBudgetModal, setShowExceedBudgetModal] = useState(false); // ✅ Modal เกินวงเงิน
+  const [submitType, setSubmitType] = useState('draft');
+  const [showExceedBudgetModal, setShowExceedBudgetModal] = useState(false);
 
-  // โหลดข้อมูล: ใช้ทั้ง /detail เพื่อเอา header summary (join) และ /full-detail เพื่อเอา photos + repairItems
+  // โหลดข้อมูล
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
+        // (แก้ไข) ⭐️ ใช้ localStorage (ตามไฟล์ Approvals)
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`http://localhost:3000/api/claims/detail-report/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-        // (แก้ไข) ⭐️ เรียก API แค่ครั้งเดียว
-        const res = await axios.get(`http://localhost:3000/api/claims/detail-report/${id}`);
-
-        // (แก้ไข) ⭐️ แยกข้อมูลจาก Response ใหม่
-        const detail = res.data.claim || null;         // (ข้อมูล Header UI)
+        const detail = res.data.claim || null;
         const full = res.data || {};
-        const rawClaim = full.claimRaw || {};          // (ข้อมูล Raw Form)
-        const rawPhotos = full.photos || [];         // (ข้อมูลรูป)
-        const rawItems = full.repairItems || [];       // (ข้อมูลรายการซ่อม)
-
+        const rawClaim = full.claimRaw || {};
+        const rawPhotos = full.photos || [];
+        const rawItems = full.repairItems || [];
 
         if (!detail || !rawClaim) {
           throw new Error('Claim data not found in response');
         }
 
-        // 1) (แก้ไข) ประกอบ object claim สำหรับ header/summary UI
+        // ⭐️ 2. ตั้งค่า isReadOnly จาก API
+        setIsReadOnly(rawClaim.isClosed === true);
+
+        // (โค้ดส่วนที่เหลือเหมือนเดิม)
         const claimForUI = {
           id: detail.id,
           claimNumber: detail.claimNumber,
           status: detail.status,
-          // (คำสั่ง 1: priority ถูกตัดออก)
-
           customerName: detail.customerFirstName + " " + detail.customerLastName || '-',
           customerPhone: detail.customerPhone || '-',
           customerEmail: detail.customerEmail || '-',
-
           policyNumber: detail.policyNumber || '-',
+          insuranceClass: detail.insuranceClass || '-',
           vehicle: {
             brand: detail.carBrand || '',
             model: detail.carModel || '',
@@ -107,22 +106,22 @@ const ClaimDetail = () => {
           incidentDate: detail.incidentDate || '',
           location: detail.location || '',
           description: detail.detail || '',
-
-          // (คำสั่ง 2: assignedOfficer)
           assignedOfficer: detail.assignedOfficer?.name || 'N/A',
-          // (คำสั่ง 3: assignedDate)
-          assignedDate: detail.assignedDate || '', // (Map มาจาก reportedDate)
+          assignedDate: detail.assignedDate || '',
           report: null,
         };
         setClaim(claimForUI);
 
-        // 2) (แก้ไข) ตั้งค่าเริ่มต้นของแบบฟอร์ม
         const initialDamageDesc = rawClaim.detail || '';
-
-        let initialDate = new Date().toISOString().split('T')[0];
-        let initialTime = new Date().toTimeString().slice(0, 5);
-
-
+        // (แก้ไข) ⭐️ ใช้ inspectionDate จาก DB ถ้ามี (สำหรับ ReadOnly)
+        let initialDate, initialTime;
+        if (rawClaim.inspectionDate) {
+          initialDate = rawClaim.inspectionDate.split('T')[0];
+          initialTime = new Date(rawClaim.inspectionDate).toTimeString().slice(0, 5);
+        } else {
+          initialDate = new Date().toISOString().split('T')[0];
+          initialTime = new Date().toTimeString().slice(0, 5);
+        }
 
         setReportData(prev => ({
           ...prev,
@@ -130,19 +129,17 @@ const ClaimDetail = () => {
           inspectionTime: initialTime,
           damageDescription: initialDamageDesc,
           repairItems: [
-            // (คำสั่ง 5: โหลดรายการจาก DB)
             ...rawItems.map(x => ({
               id: x.id,
               _id: x._id,
               existing: true,
-              type: x.type || '', // (Type ที่เรา map มา)
-              customDescription: x.customDescription || '', // (customDesc ที่เรา map มา)
+              type: x.type || '',
+              customDescription: x.customDescription || '',
               cost: x.cost ?? '',
             })),
           ],
         }));
 
-        // 3) (แก้ไข) รวมรูปจาก DB
         const existingImages = rawPhotos.map(p => ({
           id: p.id,
           _id: p._id,
@@ -163,66 +160,70 @@ const ClaimDetail = () => {
     load();
   }, [id]);
 
-  // ⭐️ ห่อ (Wrap) buildInspectionDateTime ด้วย useCallback (เผื่อ AutoSave ในอนาคต)
   const buildInspectionDateTime = useCallback(() => {
-    // รวม yyyy-mm-dd + hh:mm → "yyyy-mm-dd hh:mm"
     const d = reportData.inspectionDate || new Date().toISOString().split('T')[0];
     const t = reportData.inspectionTime || new Date().toTimeString().slice(0, 5);
     return `${d} ${t}`;
   }, [reportData.inspectionDate, reportData.inspectionTime]);
 
-  // ⭐️ (AutoSave) - (ลบ Logic ออกตามคำขอ แต่คงไว้เผื่ออนาคต)
+  // (AutoSave - คงไว้)
   const handleAutoSave = useCallback(async () => {
     // (ไม่ทำอะไรตามคำขอ)
   }, []);
-
-  // ⭐️ (AutoSave) - (ลบ Logic ออกตามคำขอ)
   useEffect(() => {
     // (ไม่ทำอะไรตามคำขอ)
   }, [handleAutoSave]);
 
 
   const handleChange = (e) => {
+    // ⭐️ 3. ป้องกันการแก้ไข
+    if (isReadOnly) return;
+
     const { name, value } = e.target || {};
     setReportData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleUpdateImages = (newFiles) => {
+    // ⭐️ 4. ป้องกันการแก้ไข (onUpdateFiles ใน FileUpload)
+    if (isReadOnly) return;
     setImages(newFiles);
   };
 
-  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
-  // (โค้ดนี้จะแค่เพิ่ม File object เข้าไปใน State)
+  // ⭐️ 5. (แก้ไข) ป้องกันการเพิ่มรูป
   const handleImagesChange = async (e) => {
+    if (isReadOnly) return;
+
     const selected = Array.from(e?.target?.files || []);
     if (!selected.length) return;
 
-    // 1. (FIX) เพิ่มไฟล์ทั้งหมดเข้า State ทันที
     const newImageEntries = selected.map(item => ({
       id: item.id,
       existing: false,
-      file: item.file,         // ⭐️ เก็บ File object
+      file: item.file,
       preview: item.preview,
       fileName: item.file.name,
       type: item.type || 'damage',
       caption: item.caption || '',
-      loading: false,          // ⭐️ ไม่ loading แล้ว
+      loading: false,
     }));
 
     setImages(prev => [...prev, ...newImageEntries]);
     if (errors.images) setErrors(prev => ({ ...prev, images: '' }));
-
   };
 
-  // (โค้ดนี้คือเวอร์ชันที่แก้ "ลบทั้งหมด" แล้ว)
   const handleRemoveImage = async (img) => {
-    // img.id จะมีค่าเสมอ (ถ้าเป็นรูปเก่า id=x._id, รูปใหม่ id=temp_...)
-    setImages(prev => prev.filter(x => x.id !== img.id));
+    // ⭐️ 6. ป้องกันการลบ
+    if (isReadOnly) return;
 
+    setImages(prev => prev.filter(x => x.id !== img.id));
     try {
       if (img.existing && img._id) {
-        await axios.delete(`http://localhost:3000/api/claims/photos/${img._id}`);
+        // (แก้ไข) ⭐️ ใช้ localStorage
+        const token = localStorage.getItem('token');
+        await axios.delete(`http://localhost:3000/api/claims/photos/${img._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
     } catch (err) {
       console.error('Delete photo failed (but UI was updated):', err);
@@ -230,6 +231,9 @@ const ClaimDetail = () => {
   };
 
   const handleAddRepairItem = () => {
+    // ⭐️ 7. ป้องกันการเพิ่ม
+    if (isReadOnly) return;
+
     setReportData(prev => ({
       ...prev,
       repairItems: [
@@ -242,12 +246,18 @@ const ClaimDetail = () => {
     }));
   };
 
-  // ลบรายการซ่อม (ถ้า existing → ลบ DB)
   const handleRemoveRepairItem = async (itemId) => {
+    // ⭐️ 8. ป้องกันการลบ
+    if (isReadOnly) return;
+
     const target = (reportData.repairItems || []).find(x => x.id === itemId);
     if (target?.existing && target?._id) {
       try {
-        await axios.delete(`http://localhost:3000/api/claims/repair-item/${target._id}`);
+        // (แก้ไข) ⭐️ ใช้ localStorage
+        const token = localStorage.getItem('token');
+        await axios.delete(`http://localhost:3000/api/claims/repair-item/${target._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       } catch (err) {
         console.error('Delete repair-item failed:', err);
       }
@@ -259,31 +269,23 @@ const ClaimDetail = () => {
   };
 
   const handleRepairItemChange = (itemId, field, value) => {
+    // ⭐️ 9. ป้องกันการแก้ไข
+    if (isReadOnly) return;
 
-    // ⭐️ 1. เพิ่ม Logic Validation สำหรับช่อง 'cost'
     if (field === 'cost') {
-
-      // 1.1 ไม่อนุญาตให้กรอก 'e', 'E', '+', '-'
       if (['e', 'E', '+', '-'].some(char => value.includes(char))) {
-        return; // ไม่ต้องอัปเดต State
+        return;
       }
-
-      // 1.2 แปลงเป็นตัวเลข
       const num = parseFloat(value);
-
-      // 1.3 ถ้าค่าเกิน 100,000
       if (num > 100000) {
         alert("ไม่สามารถกรอกค่าซ่อมเกิน 100,000 บาท");
-        value = "100000"; // (บังคับค่าสูงสุด)
+        value = "100000";
       }
-
-      // 1.4 (เผื่อไว้) ถ้าค่าน้อยกว่า 0
       if (num < 0) {
         value = "0";
       }
     }
 
-    // ⭐️ 2. (โค้ดเดิม) อัปเดต State
     setReportData(prev => ({
       ...prev,
       repairItems: prev.repairItems.map(item =>
@@ -292,12 +294,12 @@ const ClaimDetail = () => {
     }));
   };
 
+  // (ฟังก์ชันคำนวณและ validate... คงไว้เหมือนเดิม)
   const calculateTotalCost = useMemo(() => {
     return (reportData.repairItems || []).reduce((sum, item) => sum + (parseFloat(item.cost) || 0), 0);
   }, [reportData.repairItems]);
 
   const isFormComplete = () => {
-    // เกณฑ์เดิม: มีภาพ+caption, รายละเอียด >= 20 ตัว, repairItems ครบ
     const newOrExistingImages = images || [];
     const hasImages = newOrExistingImages.length > 0;
     const allImagesHaveCaption = newOrExistingImages.every(img => (img.caption || '').toString().trim());
@@ -315,16 +317,13 @@ const ClaimDetail = () => {
   const validate = () => {
     const newErrors = {};
     if ((images || []).length === 0) newErrors.images = 'กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป';
-
     const imagesWithoutCaption = (images || []).filter(img => !(img.caption || '').toString().trim());
     if (imagesWithoutCaption.length > 0) {
       newErrors.images = `มีรูปภาพ ${imagesWithoutCaption.length} รูปที่ยังไม่ได้ใส่ชื่อ`;
     }
-
     if (!reportData.damageDescription || reportData.damageDescription.trim().length < 20) {
       newErrors.damageDescription = 'กรุณาอธิบายความเสียหายอย่างน้อย 20 ตัวอักษร';
     }
-
     if ((reportData.repairItems || []).length === 0) {
       newErrors.repairItems = 'กรุณาเพิ่มรายการซ่อมอย่างน้อย 1 รายการ';
     } else {
@@ -339,80 +338,59 @@ const ClaimDetail = () => {
     return newErrors;
   };
 
-  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
-  // (ฟังก์ชันสร้าง FormData สำหรับส่ง)
+  // (ฟังก์ชัน buildFormData... คงไว้เหมือนเดิม)
   const buildFormData = (mode = 'draft') => {
-    // 1. สร้าง FormData
     const formData = new FormData();
-
-    // 2. แยกรูปใหม่ (ที่มี File) และรูปเก่า
     const newImages = images.filter(x => !x.existing && x.file);
     const photosToUpdate = images.filter(x => x.existing);
-
-    // 3. ใส่ข้อมูล Text (และ JSON ที่แปลงเป็น String)
     formData.append("damageDescription", reportData.damageDescription || '');
     formData.append("inspectionDate", buildInspectionDateTime());
-    formData.append("mode", mode); // ⭐️ (draft หรือ submit)
-
+    formData.append("mode", mode);
     formData.append("photosToUpdate", JSON.stringify(
         photosToUpdate.map(p => ({ _id: p._id, type: p.type, caption: p.caption }))
     ));
-
     formData.append("repairItems", JSON.stringify(
         reportData.repairItems.map(x => ({
           _id: x.existing ? x._id : null,
           type: x.type,
           cost: Number(x.cost) || 0,
           customDescription: x.customDescription || '',
-
-          // ⭐️⭐️⭐️ (เพิ่ม 2 บรรทัดนี้) ⭐️⭐️⭐️
-          existing: x.existing, // 1. ส่ง Flag 'existing'
-          frontendId: x.id      // 2. ส่ง ID ที่ Frontend ใช้ (ไม่ว่าจะเป็น temp หรือ dbId)
+          existing: x.existing,
+          frontendId: x.id
         }))
     ));
-
-    // 4. ใส่ไฟล์ใหม่ (และ Metadata) เป็น Array คู่ขนาน
     newImages.forEach(img => {
-      formData.append("newPhotos", img.file, img.fileName); // File
-      formData.append("newPhotoCaptions", img.caption); // String
-      formData.append("newPhotoTypes", img.type);     // String
+      formData.append("newPhotos", img.file, img.fileName);
+      formData.append("newPhotoCaptions", img.caption);
+      formData.append("newPhotoTypes", img.type);
     });
-
-    // 5. ⭐️⭐️⭐️ (เพิ่ม Logic ใหม่) ⭐️⭐️⭐️
-    // คำนวณและเพิ่ม additionalCost
     const totalCost = calculateTotalCost;
     const insuranceCoverage = claim?.vehicle?.insuranceCoverage || 0;
     const calculatedAdditionalCost = Math.max(0, totalCost - insuranceCoverage);
-
     formData.append("additionalCost", calculatedAdditionalCost);
-    // ⭐️⭐️⭐️ (จบ Logic ใหม่) ⭐️⭐️⭐️
-
     return formData;
   }
 
-  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
+  // ⭐️ (แก้ไข) เพิ่มการป้องกัน
   const handleSaveDraft = async () => {
+    if (isReadOnly) return;
     try {
       setSaving(true);
       setSubmitType('draft');
-
-      // 1. ⭐️ (แก้ไข) เรียกใช้ Function buildFormData
       const formData = buildFormData('draft');
-
-      // 2. ส่ง Request แบบ multipart/form-data
+      // (แก้ไข) ⭐️ ใช้ localStorage
+      const token = localStorage.getItem('token');
       await axios.post(
           `http://localhost:3000/api/claims/save/${id}`,
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          { headers: {
+              "Content-Type": "multipart/form-data",
+              "Authorization": `Bearer ${token}` // ⭐️ (เพิ่ม)
+            }}
       );
-
       setLastSaved(new Date());
-
       alert('บันทึกแบบร่างสำเร็จ');
-
-      // ⭐️ (สำคัญ) โหลดหน้าซ้ำหลังจากบันทึกสำเร็จ
       window.location.reload();
-
     } catch (err) {
       console.error('Save draft failed:', err);
       alert('บันทึกแบบร่างไม่สำเร็จ');
@@ -421,9 +399,10 @@ const ClaimDetail = () => {
     }
   };
 
-  // ⭐️⭐️⭐️ (แก้ไข) ⭐️⭐️⭐️
+  // ⭐️ (แก้ไข) เพิ่มการป้องกัน
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isReadOnly) return;
 
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
@@ -431,41 +410,33 @@ const ClaimDetail = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-
-    // ✅ (Logic เดิม) เช็คว่าเกินวงเงินหรือไม่
     const insuranceCoverage = claim?.vehicle?.insuranceCoverage || 0;
-    const totalCost = calculateTotalCost; // (ดึงจาก useMemo)
-
+    const totalCost = calculateTotalCost;
     if (totalCost > insuranceCoverage) {
-      // (ถ้าเกิน ➔ แสดง modal ยืนยัน)
       setShowExceedBudgetModal(true);
-      // (หยุดการ submit ปกติ)
       return;
     }
-
-    // (ถ้าไม่เกิน ➔ submit ปกติ)
     await submitClaimData();
   };
 
-  // ⭐️⭐️⭐️ (เพิ่ม Function ใหม่) ⭐️⭐️⭐️
-  // (Function สำหรับการ Submit จริง)
+  // ⭐️ (แก้ไข) เพิ่มการป้องกัน
   const submitClaimData = async () => {
+    if (isReadOnly) return;
     try {
       setSaving(true);
       setSubmitType('submit');
-
-      // 1. ⭐️ (แก้ไข) เรียกใช้ Function buildFormData
       const formData = buildFormData('submit');
-
-      // 2. ส่ง Request แบบ multipart/form-data
+      // (แก้ไข) ⭐️ ใช้ localStorage
+      const token = localStorage.getItem('token');
       await axios.post(
           `http://localhost:3000/api/claims/save/${id}`,
           formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          { headers: {
+              "Content-Type": "multipart/form-data",
+              "Authorization": `Bearer ${token}` // ⭐️ (เพิ่ม)
+            }}
       );
-
       setShowSuccessModal(true);
-
     } catch (err) {
       console.error('Submit failed:', err);
       alert('ส่งออกไม่สำเร็จ');
@@ -474,20 +445,15 @@ const ClaimDetail = () => {
     }
   }
 
-
   const handleExportPDF = () => {
-    // placeholder
     console.log('Export PDF for claim:', id);
   };
-
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     navigate('/insurance');
   };
 
-  // ====== UI เดิมทั้งหมดด้านล่าง — ไม่แก้ layout/คลาส/โครง DOM ======
-  // (isUploading ถูกลบออกจาก <button> (บรรทัด 724, 741) เพราะเราไม่อัปโหลดทันที)
-
+  // (Loading และ !claim UI ... เหมือนเดิม)
   if (loading) {
     return (
         <div className="flex items-center justify-center h-96">
@@ -514,7 +480,7 @@ const ClaimDetail = () => {
 
   return (
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header (เหมือนเดิม) */}
         <div className="flex items-start justify-between">
           <div>
             <button
@@ -526,17 +492,19 @@ const ClaimDetail = () => {
             </button>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-neutral-dark">{claim.claimNumber}</h1>
-
             </div>
             <div className="flex items-center gap-3">
-              <p className="text-neutral-500">อัปโหลดรายงานจากการตรวจสอบพื้นที่</p>
-              {lastSaved && (
+              <p className="text-neutral-500">
+                {/* ⭐️ (แก้ไข) เปลี่ยนข้อความ */}
+                {isReadOnly ? "รายละเอียดเคสที่เสร็จสิ้น" : "อัปโหลดรายงานจากการตรวจสอบพื้นที่"}
+              </p>
+              {lastSaved && !isReadOnly && (
                   <p className="text-xs text-neutral-400">
                     <span className="material-icons-round text-xs align-middle mr-1">check_circle</span>
                     บันทึกล่าสุด: {lastSaved.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                   </p>
               )}
-              {autoSaving && (
+              {autoSaving && !isReadOnly && (
                   <p className="text-xs text-primary-500">
                     <span className="material-icons-round text-xs align-middle mr-1 animate-spin">sync</span>
                     กำลังบันทึก...
@@ -550,8 +518,9 @@ const ClaimDetail = () => {
           </button>
         </div>
 
-        {/* Claim Info Summary */}
+        {/* Claim Info Summary (เหมือนเดิม) */}
         <div className="card-static bg-primary-50 border-2 border-primary-200">
+          {/* ... (เนื้อหาเหมือนเดิม) ... */}
           <div className="flex items-center gap-3 mb-4">
             <span className="material-icons-round text-3xl text-primary-600">assignment</span>
             <div>
@@ -559,7 +528,6 @@ const ClaimDetail = () => {
               <p className="text-sm text-neutral-600">{claim.claimNumber}</p>
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <p className="text-xs text-neutral-500 mb-1">ลูกค้า</p>
@@ -577,19 +545,16 @@ const ClaimDetail = () => {
               <p className="text-xs text-neutral-500 mb-1">วันเกิดเหตุ</p>
               <p className="font-medium text-neutral-dark">{claim.incidentDate}</p>
             </div>
-            {/* ✅ [เพิ่ม] ส่วนที่ 1: เลขกรมธรรม์ */}
             <div>
               <p className="text-xs text-neutral-500 mb-1">เลขกรมธรรม์</p>
               <p className="font-medium text-neutral-dark">
-                {/* (ใช้ '?' เพื่อป้องกัน error หาก 'vehicle' หรือ 'policyNumber' ไม่มีข้อมูล) */}
-                {claim.vehicle?.policyNumber || '-'}
+                {claim.policyNumber || '-'}
               </p>
             </div>
-            {/* ✅ [เพิ่ม] ส่วนที่ 2: ประเภทประกัน */}
             <div>
               <p className="text-xs text-neutral-500 mb-1">ประเภทประกัน</p>
               <p className="font-medium text-neutral-dark">
-                ชั้น {claim.vehicle?.insuranceClass || 'N/A'}
+                ชั้น {claim.insuranceClass || 'N/A'}
               </p>
             </div>
           </div>
@@ -602,18 +567,19 @@ const ClaimDetail = () => {
             <div className="card-static">
               <h2 className="text-xl font-semibold text-neutral-dark mb-4 flex items-center gap-2">
                 <span className="material-icons-round text-primary-500">photo_camera</span>
-                <span>อัปโหลดรูปภาพความเสียหายและเอกสารประกอบ</span>
+                <span>{isReadOnly ? "รูปภาพความเสียหายและเอกสาร" : "อัปโหลดรูปภาพความเสียหายและเอกสารประกอบ"}</span>
               </h2>
 
-              {/* ใช้ FileUpload ตัวเดิม แต่เราจะผูก onChange -> upload-temp + push เข้า images */}
+              {/* ⭐️ (แก้ไข) ส่ง isReadOnly prop */}
               <FileUpload
                   withDetails={true}
                   accept="image/*"
                   multiple
                   files={images}
-                  onUpdateFiles={setImages}
+                  onUpdateFiles={handleUpdateImages}
                   error={errors.images}
-                  claimId={claim.id} // ⬅️ ⭐️ ต้องส่ง ID ของเคสไปด้วย
+                  claimId={claim.id}
+                  isReadOnly={isReadOnly} // ⭐️ (ส่ง prop)
               />
             </div>
 
@@ -634,7 +600,7 @@ const ClaimDetail = () => {
                       onChange={handleChange}
                       icon="calendar_today"
                       required
-                      disabled
+                      disabled // (ตัวนี้ disabled อยู่แล้ว)
                   />
 
                   <Input
@@ -645,7 +611,7 @@ const ClaimDetail = () => {
                       onChange={handleChange}
                       icon="schedule"
                       required
-                      disabled
+                      disabled // (ตัวนี้ disabled อยู่แล้ว)
                   />
                 </div>
 
@@ -654,10 +620,11 @@ const ClaimDetail = () => {
                     name="damageDescription"
                     value={reportData.damageDescription}
                     onChange={handleChange}
-                    placeholder="อธิบายความเสียหายโดยละเอียด เช่น กันชนหน้าบุบ ไฟหน้าซ้ายแตก..."
+                    placeholder="อธิบายความเสียหายโดยละเอียด..."
                     rows={6}
                     required
                     error={errors.damageDescription}
+                    disabled={isReadOnly} // ⭐️ (ปิดการแก้ไข)
                 />
               </div>
             </div>
@@ -669,12 +636,15 @@ const ClaimDetail = () => {
                   <span className="material-icons-round text-primary-500">build</span>
                   <span>รายการซ่อม</span>
                 </h2>
-                <button type="button" onClick={handleAddRepairItem} className="btn-primary btn-sm">
-                  <span className="material-icons-round mr-1">add</span>เพิ่มรายการ
-                </button>
+                {/* ⭐️ (ซ่อนปุ่มเพิ่ม) */}
+                {!isReadOnly && (
+                    <button type="button" onClick={handleAddRepairItem} className="btn-primary btn-sm">
+                      <span className="material-icons-round mr-1">add</span>เพิ่มรายการ
+                    </button>
+                )}
               </div>
 
-              {errors.repairItems && (
+              {errors.repairItems && !isReadOnly && ( // ⭐️ (ซ่อน Error)
                   <div className="mb-4 p-4 bg-error/10 border border-error rounded-lg">
                     <p className="text-error text-sm">{errors.repairItems}</p>
                   </div>
@@ -683,7 +653,9 @@ const ClaimDetail = () => {
               {reportData.repairItems.length === 0 ? (
                   <div className="text-center py-12 bg-neutral-50 rounded-lg">
                     <span className="material-icons-round text-5xl text-neutral-300 mb-3">construction</span>
-                    <p className="text-neutral-500">ยังไม่มีรายการซ่อม กรุณาเพิ่มรายการ</p>
+                    <p className="text-neutral-500">
+                      {isReadOnly ? "ไม่มีรายการซ่อม" : "ยังไม่มีรายการซ่อม กรุณาเพิ่มรายการ"}
+                    </p>
                   </div>
               ) : (
                   <div className="space-y-3">
@@ -691,17 +663,19 @@ const ClaimDetail = () => {
                         <div key={item.id} className="p-4 bg-neutral-50 rounded-lg space-y-3">
                           <div className="flex items-start justify-between">
                             <p className="text-sm font-medium text-neutral-700">รายการที่ {index + 1}</p>
-                            <button
-                                type="button"
-                                onClick={() => handleRemoveRepairItem(item.id)}
-                                className="text-neutral-400 hover:text-error transition-colors"
-                            >
-                              <span className="material-icons-round">delete</span>
-                            </button>
+                            {/* ⭐️ (ซ่อนปุ่มลบ) */}
+                            {!isReadOnly && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveRepairItem(item.id)}
+                                    className="text-neutral-400 hover:text-error transition-colors"
+                                >
+                                  <span className="material-icons-round">delete</span>
+                                </button>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* Dropdown รายการซ่อม */}
                             <div>
                               <label className="block text-xs font-medium text-neutral-600 mb-1">
                                 ประเภทการซ่อม <span className="text-error">*</span>
@@ -710,6 +684,7 @@ const ClaimDetail = () => {
                                   value={item.type}
                                   onChange={(e) => handleRepairItemChange(item.id, 'type', e.target.value)}
                                   className="input-field"
+                                  disabled={isReadOnly} // ⭐️ (ปิดการแก้ไข)
                               >
                                 <option value="">-- เลือกรายการ --</option>
                                 {REPAIR_ITEMS_OPTIONS.map(opt => (
@@ -720,7 +695,6 @@ const ClaimDetail = () => {
                               </select>
                             </div>
 
-                            {/* ค่าใช้จ่าย */}
                             <div>
                               <label className="block text-xs font-medium text-neutral-600 mb-1">
                                 ค่าใช้จ่าย (บาท) <span className="text-error">*</span>
@@ -729,17 +703,16 @@ const ClaimDetail = () => {
                                   type="number"
                                   placeholder="0"
                                   value={item.cost}
-                                  min="0" // ⭐️ 1. ป้องกันค่าติดลบ
-                                  step="any" // ⭐️ 2. อนุญาตทศนิยม
-                                  // ⭐️ 3. ดักจับการพิมพ์ 'e', '+', '-'
+                                  min="0"
+                                  step="any"
                                   onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                                   onChange={(e) => handleRepairItemChange(item.id, 'cost', e.target.value)}
                                   className="input-field"
+                                  disabled={isReadOnly} // ⭐️ (ปิดการแก้ไข)
                               />
                             </div>
                           </div>
 
-                          {/* ถ้าเลือก "อื่นๆ" ให้แสดงช่องระบุ */}
                           {item.type === 'other' && (
                               <div>
                                 <label className="block text-xs font-medium text-neutral-600 mb-1">
@@ -751,35 +724,31 @@ const ClaimDetail = () => {
                                     value={item.customDescription}
                                     onChange={(e) => handleRepairItemChange(item.id, 'customDescription', e.target.value)}
                                     className="input-field"
+                                    disabled={isReadOnly} // ⭐️ (ปิดการแก้ไข)
                                 />
                               </div>
                           )}
                         </div>
                     ))}
 
-                    {/* สรุปค่าใช้จ่าย */}
+                    {/* สรุปค่าใช้จ่าย (เหมือนเดิม) */}
                     <div className="space-y-2">
-                      {/* วงเงินประกัน */}
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-neutral-600">วงเงินประกัน</span>
                         <span className="font-semibold text-primary-600">
-                      ฿{(claim?.vehicle?.insuranceCoverage || 0).toLocaleString()}
-                    </span>
+                          ฿{(claim?.vehicle?.insuranceCoverage).toLocaleString()}
+                        </span>
                       </div>
-
-                      {/* ประเมินค่าใช้จ่ายโดยรวม */}
                       <div className="flex justify-between items-center p-4 bg-primary-50 rounded-lg border-2 border-primary-200">
                         <span className="font-semibold text-neutral-dark">ประเมินค่าใช้จ่ายโดยรวม</span>
                         <span className="text-2xl font-bold text-primary-600">฿{totalCost.toLocaleString()}</span>
                       </div>
-
-                      {/* ค่าใช้จ่ายเพิ่มเติม (ถ้าเกิน) */}
                       {totalCost > (claim?.vehicle?.insuranceCoverage || 0) && (
                           <div className="flex justify-between items-center text-sm">
                             <span className="text-error">ค่าใช้จ่ายเพิ่มเติม (เกินวงเงิน)</span>
                             <span className="font-bold text-error text-lg">
-                        ฿{(totalCost - (claim?.vehicle?.insuranceCoverage || 0)).toLocaleString()}
-                      </span>
+                              ฿{(totalCost - (claim?.vehicle?.insuranceCoverage || 0)).toLocaleString()}
+                            </span>
                           </div>
                       )}
                     </div>
@@ -790,8 +759,9 @@ const ClaimDetail = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Status Card */}
-            {formComplete && (
+
+            {/* (Status Card ... เหมือนเดิม) */}
+            {formComplete && !isReadOnly && ( // ⭐️ (ซ่อนถ้า ReadOnly)
                 <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="material-icons-round text-3xl">check_circle</span>
@@ -806,82 +776,85 @@ const ClaimDetail = () => {
                 </div>
             )}
 
-            {/* Info Card */}
-            <div className="card bg-gradient-primary text-white">
-              <span className="material-icons-round text-4xl mb-3">info</span>
-              <h3 className="font-semibold mb-2">ขั้นตอนการอัปโหลด</h3>
-              <ol className="text-sm text-white/80 space-y-2 list-decimal list-inside">
-                <li>อัปโหลดรูปภาพ (ใส่ชื่อทุกรูป)</li>
-                <li>กรอกรายละเอียดความเสียหาย</li>
-                <li>เลือกรายการซ่อม + ใส่ราคา</li>
-                <li>บันทึกแบบร่าง หรือส่งออก</li>
-              </ol>
-            </div>
+            {/* ⭐️ (แก้ไข) ซ่อนการ์ด "ขั้นตอนการอัปโหลด" ถ้า ReadOnly */}
+            {!isReadOnly && (
+                <div className="card bg-gradient-primary text-white">
+                  <span className="material-icons-round text-4xl mb-3">info</span>
+                  <h3 className="font-semibold mb-2">ขั้นตอนการอัปโหลด</h3>
+                  <ol className="text-sm text-white/80 space-y-2 list-decimal list-inside">
+                    <li>อัปโหลดรูปภาพ (ใส่ชื่อทุกรูป)</li>
+                    <li>กรอกรายละเอียดความเสียหาย</li>
+                    <li>เลือกรายการซ่อม + ใส่ราคา</li>
+                    <li>บันทึกแบบร่าง หรือส่งออก</li>
+                  </ol>
+                </div>
+            )}
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              {/* บันทึกและส่งออก (ถ้าข้อมูลครบ) */}
-              {formComplete ? (
-                  <button
-                      type="submit"
-                      className="btn-primary w-full flex items-center justify-center gap-2"
-                      disabled={saving} // ⭐️ ลบ isUploading
-                  >
-                    {saving && submitType === 'submit' ? (
-                        <>
-                          <span className="material-icons-round animate-spin">refresh</span>
-                          <span>กำลังส่งออก...</span>
-                        </>
-                    ) : (
-                        <>
-                          <span className="material-icons-round">send</span>
-                          <span>บันทึกและส่งออก</span>
-                        </>
-                    )}
-                  </button>
-              ) : (
+            {/* ⭐️ (ซ่อนปุ่ม Action ทั้งหมด) */}
+            {!isReadOnly && (
+                <div className="space-y-3">
+                  {formComplete ? (
+                      <button
+                          type="submit"
+                          className="btn-primary w-full flex items-center justify-center gap-2"
+                          disabled={saving}
+                      >
+                        {saving && submitType === 'submit' ? (
+                            <>
+                              <span className="material-icons-round animate-spin">refresh</span>
+                              <span>กำลังส่งออก...</span>
+                            </>
+                        ) : (
+                            <>
+                              <span className="material-icons-round">send</span>
+                              <span>บันทึกและส่งออก</span>
+                            </>
+                        )}
+                      </button>
+                  ) : (
+                      <button
+                          type="button"
+                          onClick={handleSaveDraft}
+                          className="btn-primary w-full flex items-center justify-center gap-2"
+                          disabled={saving}
+                      >
+                        {saving && submitType === 'draft' ? (
+                            <>
+                              <span className="material-icons-round animate-spin">refresh</span>
+                              <span>กำลังบันทึก...</span>
+                            </>
+                        ) : (
+                            <>
+                              <span className="material-icons-round">save</span>
+                              <span>บันทึกแบบร่าง</span>
+                            </>
+                        )}
+                      </button>
+                  )}
                   <button
                       type="button"
-                      onClick={handleSaveDraft}
-                      className="btn-primary w-full flex items-center justify-center gap-2"
-                      disabled={saving} // ⭐️ ลบ isUploading
+                      onClick={() => navigate(-1)}
+                      className="btn-outline w-full"
+                      disabled={saving}
                   >
-                    {saving && submitType === 'draft' ? (
-                        <>
-                          <span className="material-icons-round animate-spin">refresh</span>
-                          <span>กำลังบันทึก...</span>
-                        </>
-                    ) : (
-                        <>
-                          <span className="material-icons-round">save</span>
-                          <span>บันทึกแบบร่าง</span>
-                        </>
-                    )}
+                    ยกเลิก
                   </button>
-              )}
+                </div>
+            )}
 
-              {/* ยกเลิก */}
-              <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  className="btn-outline w-full"
-                  disabled={saving}
-              >
-                ยกเลิก
-              </button>
-            </div>
-
-            {/* Auto-save Info */}
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-neutral-700">
-                <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
-                ระบบจะบันทึกแบบร่างอัตโนมัติทุก 30 วินาที
-              </p>
-            </div>
+            {/* (Auto-save Info ... เหมือนเดิม) */}
+            {!isReadOnly && ( // ⭐️ (ซ่อนถ้า ReadOnly)
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-neutral-700">
+                    <span className="material-icons-round text-sm mr-1 align-middle text-info">info</span>
+                    ระบบจะบันทึกแบบร่างอัตโนมัติทุก 30 วินาที
+                  </p>
+                </div>
+            )}
           </div>
         </form>
 
-        {/* Success Modal */}
+        {/* (Modals ... เหมือนเดิม) */}
         {showSuccessModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl p-8 max-w-md w-full animate-scale-in">
@@ -903,7 +876,6 @@ const ClaimDetail = () => {
             </div>
         )}
 
-        {/* ✅ Modal แจ้งเตือนเกินวงเงิน */}
         {showExceedBudgetModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl p-8 max-w-md w-full">
@@ -913,39 +885,35 @@ const ClaimDetail = () => {
                   warning
                 </span>
                   </div>
-
                   <h2 className="text-2xl font-bold mb-2 text-neutral-dark">
                     เกินวงเงินประกัน
                   </h2>
-
                   <div className="bg-neutral-50 p-4 rounded-lg mb-4 text-left">
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-neutral-600">ค่าซ่อมประเมิน</span>
                         <span className="font-bold text-neutral-dark">
-                      ฿{totalCost.toLocaleString()}
-                    </span>
+                          ฿{totalCost.toLocaleString()}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-neutral-600">วงเงินคุ้มครอง</span>
                         <span className="font-bold text-primary-600">
-                      ฿{(claim?.vehicle?.insuranceCoverage || 0).toLocaleString()}
-                    </span>
+                          ฿{(claim?.vehicle?.insuranceCoverage || 0).toLocaleString()}
+                        </span>
                       </div>
                       <div className="border-t border-neutral-200 pt-2 flex justify-between">
                         <span className="text-error font-medium">ส่วนเกิน</span>
                         <span className="font-bold text-error text-lg">
-                      ฿{(totalCost - (claim?.vehicle?.insuranceCoverage || 0)).toLocaleString()}
-                    </span>
+                          ฿{(totalCost - (claim?.vehicle?.insuranceCoverage || 0)).toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
-
                   <p className="text-neutral-600 mb-6">
                     รอลูกค้ายอมรับความยินยอม<br />
                     รับผิดชอบส่วนเกินวงเงิน
                   </p>
-
                   <div className="flex gap-3">
                     <button
                         onClick={() => setShowExceedBudgetModal(false)}
@@ -955,9 +923,8 @@ const ClaimDetail = () => {
                     </button>
                     <button
                         onClick={async () => {
-                          // ⭐️ (แก้ไข) ให้กดปุ่มนี้แล้ว Submit จริง
                           setShowExceedBudgetModal(false);
-                          await submitClaimData(); // ⭐️ เรียกใช้ Function Submit จริง
+                          await submitClaimData();
                         }}
                         className="btn-primary flex-1"
                     >

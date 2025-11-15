@@ -17,6 +17,11 @@ const AdditionalApprove = sequelize.define('AdditionalApprove', {
         defaultValue: 'pending',
         allowNull: false,
     },
+    approver: {
+        type: DataTypes.ENUM('insurance', 'garage'),
+        defaultValue: 'insurance',
+        allowNull: false,
+    },
     approvedAmount: {
         type: DataTypes.FLOAT,
         defaultValue: 0,

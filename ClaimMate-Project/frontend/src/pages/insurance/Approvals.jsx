@@ -1,45 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal, TextArea } from '../../components';
-import axios from 'axios'; // ⭐️ (เพิ่ม)
-import Cookies from 'js-cookie'; // ⭐️ (เพิ่ม)
+import axios from 'axios';
+// ⭐️ (ลบ) import Cookies from 'js-cookie'; (เราไม่ใช้แล้ว)
 
 /**
  * Approvals - หน้าจัดการคำขออนุมัติ
  * ... (Comments เดิม) ...
  */
 const Approvals = () => {
-  const [activeTab, setActiveTab] = useState('customer'); // 'customer', 'garage', 'history'
+  const [activeTab, setActiveTab] = useState('customer');
   const [loading, setLoading] = useState(true);
   const [approvals, setApprovals] = useState({
     customer: [],
     garage: [],
     history: []
   });
+
+  // ⭐️ (เพิ่ม) State สำหรับเก็บ User ที่ login (เหมือน CreateClaim.jsx)
+  const [currentUser, setCurrentUser] = useState(null);
+
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
-  const [actionType, setActionType] = useState(null); // 'approve' or 'reject'
+  const [actionType, setActionType] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  // ⭐ Search & Filter for History
   const [searchTerm, setSearchTerm] = useState('');
-  const [historyFilter, setHistoryFilter] = useState('all'); // 'all', 'approved', 'rejected'
+  const [historyFilter, setHistoryFilter] = useState('all');
+
+  // ⭐️ (เพิ่ม) useEffect นี้ (เหมือน CreateClaim.jsx)
+  // 1. ดึงข้อมูลผู้ใช้ที่ login อยู่
+  useEffect(() => {
+    const stored = localStorage.getItem("claimmate_user");
+    if (stored) {
+      const userData = JSON.parse(stored);
+      // (เราต้องการ insuranceID จาก object นี้)
+      if (userData && userData.insuranceID) {
+        setCurrentUser(userData);
+      } else {
+        console.error("User data in localStorage is missing insuranceID");
+        // (ควร handle error เช่น redirect ไป login)
+      }
+    }
+  }, []);
 
 
   // ⭐️ (แก้ไข) สร้าง Function สำหรับดึงข้อมูลทั้งหมด
   const fetchData = async () => {
+    // ⭐️ (เพิ่ม) รอจนกว่า currentUser จะถูกโหลด
+    if (!currentUser) return;
+
     setLoading(true);
     let customerData = [];
 
     // --- 1. ดึงข้อมูลจริง (Customer Requests) ---
     try {
-      const token = Cookies.get('token');
-      const response = await axios.get('/api/claims/approvals/customer', {
-        headers: { Authorization: `Bearer ${token}` }
+      // ⭐️ (แก้ไข) ลบ Token ออก
+      // ⭐️ (แก้ไข) เพิ่ม params: { insuranceId: ... }
+      const response = await axios.get('http://localhost:3000/api/claims/approvals/customer', {
+        params: {
+          insuranceId: currentUser.insuranceID // ⬅️ ส่ง ID ไปใน query
+        }
       });
       customerData = response.data;
     } catch (err) {
@@ -58,10 +83,10 @@ const Approvals = () => {
     setLoading(false);
   };
 
-  // ⭐️ (แก้ไข) useEffect ให้เรียก fetchData
+  // ⭐️ (แก้ไข) useEffect นี้ ให้ทำงานเมื่อ currentUser พร้อม
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentUser]); // ⬅️ ให้ re-run เมื่อ currentUser ถูก set
 
   const handleViewDetail = (approval) => {
     setSelectedApproval(approval);
@@ -86,7 +111,7 @@ const Approvals = () => {
     setShowImageModal(true);
   };
 
-  // ⭐️ (แก้ไข) เชื่อมต่อ confirmAction
+  // ⭐️ (แก้ไข) เชื่อมต่อ confirmAction (ลบ Token ออก)
   const confirmAction = async () => {
     if (actionType === 'reject' && (!rejectReason || rejectReason.trim().length < 10)) {
       alert('กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
@@ -96,16 +121,14 @@ const Approvals = () => {
     setProcessing(true);
 
     try {
-      const token = Cookies.get('token');
+      // ⭐️ (แก้ไข) ลบ Token ออก
       await axios.put(
-          `/api/claims/approvals/${selectedApproval.id}/decide`,
+          `http://localhost:3000/api/claims/approvals/${selectedApproval.id}/decide`,
           {
-            action: actionType, // 'approve' or 'reject'
-            rejectReason: rejectReason // (จะถูกใช้เมื่อ action === 'reject')
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` }
+            action: actionType,
+            rejectReason: rejectReason
           }
+          // ⭐️ (แก้ไข) ลบ Header Authorization ออก
       );
 
       // สำเร็จ
@@ -122,6 +145,10 @@ const Approvals = () => {
       alert('เกิดข้อผิดพลาดในการดำเนินการ');
     }
   };
+
+  // (โค้ดส่วนที่เหลือทั้งหมดเหมือนเดิมทุกประการ)
+  // ... (getReasonLabel, getStatusBadge, filteredHistory, currentApprovals, pendingCount) ...
+  // ... (JSX ทั้งหมดตั้งแต่ <h2>, <h3>, <Tabs>, <Cards>, <Modals>...) ...
 
   const getReasonLabel = (reason) => {
     const reasons = {
@@ -605,7 +632,6 @@ const Approvals = () => {
                         <p className="text-sm text-neutral-500 mb-1">รายละเอียด</p>
                         <p className="text-neutral-700">{selectedApproval.description}</p>
                       </div>
-                      {/* ⭐️ (เพิ่ม) ส่วนแสดงรูปภาพและลิงก์ */}
                       {selectedApproval.attachments && selectedApproval.attachments.length > 0 && (
                           <div>
                             <p className="text-sm text-neutral-500 mb-2">เอกสาร/รูปภาพประกอบ</p>
@@ -774,8 +800,8 @@ const Approvals = () => {
             isOpen={showImageModal}
             onClose={() => setShowImageModal(false)}
             title="รายละเอียดรูปภาพ"
-            size="2xl" // ปรับขนาดให้ใหญ่ขึ้นสำหรับรูปภาพ
-            className="!p-0" // ลบ padding ออกจาก Modal content
+            size="2xl"
+            className="!p-0"
             contentClassName="!p-0"
         >
           {imagePreviewUrl && (
@@ -785,7 +811,6 @@ const Approvals = () => {
                     alt="Attachment Preview"
                     className="object-contain w-full h-full"
                 />
-                {/* ⭐️ (เพิ่ม) ปุ่มปิดตามรูปตัวอย่าง (ตำแหน่งขวาบน) */}
                 <button
                     onClick={() => setShowImageModal(false)}
                     className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
@@ -800,8 +825,7 @@ const Approvals = () => {
   );
 };
 
-
-// ⭐️ (เพิ่ม) Function สำหรับดึงข้อมูล Mockup
+// ⭐️ (เพิ่ม) Function สำหรับดึงข้อมูล Mockup (เหมือนเดิม)
 const getMockupData = () => ({
   garage: [
     {

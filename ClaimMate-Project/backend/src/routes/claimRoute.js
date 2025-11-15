@@ -13,6 +13,7 @@ const {
     AccidentPhoto,
     RepairItem,
     AdditionalSurvey,
+    AdditionalApprove,   // ⬅️ ตรวจสอบว่ามี
     Satisfaction,
     Garage,
     UrgentRequest,
@@ -226,12 +227,12 @@ router.post('/', async (req, res) => {
 
 // (List นี้สำหรับ map 'itemName' กลับไปเป็น 'type' ตามคำสั่ง 5)
 const REPAIR_ITEM_TYPES = [
-    'bumper_front', 'bumper_rear', 'hood', 'headlight', 'taillight',
-    'door_front_left', 'door_front_right', 'door_rear_left', 'door_rear_right',
-    'fender_left', 'fender_right', 'windshield_front', 'windshield_rear',
-    'window_left', 'window_right', 'mirror_left', 'mirror_right',
-    'paint_front', 'paint_rear', 'paint_left', 'paint_right',
-    'tire_replace', 'rim_replace', 'suspension', 'alignment'
+    'เปลี่ยนกันชนหน้า', 'เปลี่ยนกันชนหลัง', 'ซ่อม/เปลี่ยนฝากระโปรงหน้า', 'เปลี่ยนไฟหน้า', 'เปลี่ยนไฟท้าย',
+    'ซ่อมประตูหน้าซ้าย', 'ซ่อมประตูหน้าขวา', 'ซ่อมประตูหลังซ้าย', 'ซ่อมประตูหลังขวา',
+    'ซ่อมบังโคลนซ้าย', 'ซ่อมบังโคลนขวา', 'เปลี่ยนกระจกหน้า', 'เปลี่ยนกระจกหลัง',
+    'เปลี่ยนกระจกข้างซ้าย', 'เปลี่ยนกระจกข้างขวา', 'เปลี่ยนกระจกมองข้างซ้าย', 'เปลี่ยนกระจกมองข้างขวา',
+    'พ่นสีด้านหน้า', 'พ่นสีด้านหลัง', 'พ่นสีด้านซ้าย', 'พ่นสีด้านขวา',
+    'เปลี่ยนยาง', 'เปลี่ยนล้อ', 'ซ่อมช่วงล่าง', 'ตั้งศูนย์ล้อ'
 ];
 
 router.get('/detail-report/:id', async (req, res) => {
@@ -304,6 +305,8 @@ router.get('/detail-report/:id', async (req, res) => {
             customerEmail: customer.email || '',
 
             policyNumber: policy.policyNumber || '',
+            insuranceClass: policy.level || '',
+
             carBrand: car.brand || '',
             carModel: car.model || '',
             carYear: car.year || '',
@@ -354,6 +357,8 @@ router.get('/detail-report/:id', async (req, res) => {
             reportedDate: status.reportedDate,
             // (คำสั่ง 4)
             inspectionDate: status.inspectionDate, // (ใช้ field นี้ตั้งต้นฟอร์ม)
+
+            isClosed: status.isClosed
         };
 
         // ส่ง Response กลับไปใน Format ที่ Frontend คาดหวัง
@@ -728,32 +733,98 @@ router.get('/history', async (req, res) => {
     }
 });
 
-// 11. ⭐️ (Route ใหม่ - สำหรับ Sidebar Stats) ⭐️
+// 11. ⭐️ (Route แก้ไข - สำหรับ Sidebar Stats) ⭐️
 /**
  * @route   GET /api/claims/stats
- * @desc    (NEW) ดึงข้อมูลสถิติจำนวนเคสสำหรับ Sidebar
+ * @desc    (อัปเกรด) ดึงข้อมูลสถิติทั้งหมดสำหรับ Sidebar (กรองตาม Insurance)
  * @access  Private (Insurance)
  */
 router.get('/stats', async (req, res) => {
+
+    // 1. ⭐️ (คงเดิม) รับ insuranceId จาก req.query
+    const { insuranceId } = req.query;
+
+    if (!insuranceId) {
+        return res.status(400).json({ message: 'insuranceId is required' });
+    }
+
     try {
-        // 1. เคลมทั้งหมด (นับจากตาราง Claim)
-        const totalClaims = await Claim.count();
+        // --- (A) สำหรับกล่อง Quick Stats ด้านล่าง ---
 
-        // 2. รอดำเนินการ (นับจาก ClaimStatus)
-        const pendingClaims = await ClaimStatus.count({
-            where: { isClosed: false }
+// (A.1) เคลมทั้งหมด (ในระบบ)
+        const totalClaims = await Claim.count(); // ⭐️ (แก้ไข) ลบ where
+
+        // (A.2) รอดำเนินการ (ทั้งหมดในระบบ)
+        const allPendingClaims = await Claim.count({
+            // ⭐️ (แก้ไข) ลบ where
+            include: [{
+                model: ClaimStatus,
+                where: { isClosed: false },
+                required: true
+            }]
         });
 
-        // 3. เสร็จสิ้น (นับจาก ClaimStatus)
-        const completedClaims = await ClaimStatus.count({
-            where: { isClosed: true }
+        // (A.3) เสร็จสิ้น (ทั้งหมดในระบบ)
+        const completedClaims = await Claim.count({
+            // ⭐️ (แก้ไข) ลบ where
+            include: [{
+                model: ClaimStatus,
+                where: { isClosed: true },
+                required: true
+            }]
         });
 
-        // ส่งข้อมูลกลับเป็น JSON object
+        // --- (B) สำหรับ Badges ด้านบน ---
+
+        // (B.1) ⭐️ Badge 1: เคสที่กำลังดำเนินการ (currentStep = 1)
+        const activeClaimsBadge = await Claim.count({
+            where: { insuranceId: insuranceId },
+            include: [{
+                model: ClaimStatus,
+                where: { currentStep: 1 }, // ⬅️ (Logic ใหม่ตามที่คุณขอ)
+                required: true
+            }]
+        });
+
+        // (B.2) ⭐️ Badge 2: คำขออนุมัติ
+        // (นับ UrgentRequest ที่รอ insurance)
+        const urgentCount = await UrgentRequest.count({
+            where: {
+                approver: 'insurance',
+                approvalStatus: 'pending' // ⬅️ (นับเฉพาะที่รอ)
+            },
+            include: [{
+                model: Claim,
+                where: { insuranceId: insuranceId },
+                required: true
+            }]
+        });
+
+        // (นับ AdditionalApprove ที่รอ insurance)
+        const additionalCount = await AdditionalApprove.count({
+            where: {
+                approver: 'insurance',
+                approvalStatus: 'pending' // ⬅️ (นับเฉพาะที่รอ)
+            },
+            include: [{
+                model: Claim,
+                where: { insuranceId: insuranceId },
+                required: true
+            }]
+        });
+
+        const totalApprovalRequests = urgentCount + additionalCount;
+
+        // --- (C) ส่งข้อมูลกลับ ---
         res.status(200).json({
+            // (สำหรับ Quick Stats)
             totalClaims: totalClaims,
-            pendingClaims: pendingClaims,
-            completedClaims: completedClaims
+            allPendingClaims: allPendingClaims, // ⬅️ (ส่งตัวนี้สำหรับ Quick Stats)
+            completedClaims: completedClaims,
+
+            // (สำหรับ Badges)
+            activeClaimsBadge: activeClaimsBadge, // ⬅️ (Badge 1)
+            approvalRequests: totalApprovalRequests // ⬅️ (Badge 2)
         });
 
     } catch (error) {
@@ -1342,15 +1413,122 @@ router.post('/urgent-request', upload.single('file'), async (req, res) => {
     }
 });
 
-
+// -----------------------------------------------------------------
+// ⭐️ 12. (Route ใหม่) ดึงคำขอซ่อมด่วน (สำหรับหน้า Approvals)
+// (แก้ไข: เอา authenticate ออก, รับ insuranceId จาก query)
+// -----------------------------------------------------------------
 /**
- * @route   GET /api/claims/customer/:customerId
- * @desc    ดึงรายการเคลมทั้งหมดของลูกค้าคนหนึ่ง
- * @access  Private (Customer)
+ * @route   GET /api/claims/approvals/customer
+ * @desc    (NEW) ดึง Urgent Requests ที่รอ Insurance อนุมัติ (สำหรับ Tab 1)
+ * @access  Private (Insurance)
  */
-// ... (โค้ดเดิมของ /customer/:customerId, /customer/:customerId/stats, /detail/:id, /full-detail/:id, /:id/accept-extra-cost) ...
+router.get('/approvals/customer', async (req, res) => {
+
+    // ⭐️ (แก้ไข) รับ insuranceId จาก req.query (ที่ส่งมาจาก Frontend)
+    const { insuranceId } = req.query;
+
+    if (!insuranceId) {
+        // ⭐️ (แก้ไข) เปลี่ยนจาก 403 เป็น 400 (Bad Request)
+        return res.status(400).json({ message: 'insuranceId is required' });
+    }
+
+    try {
+        const requests = await UrgentRequest.findAll({
+            where: {
+                approvalStatus: 'pending',
+                approver: 'insurance'
+            },
+            include: [{
+                model: Claim,
+                // ⭐️ (แก้ไข) ใช้ insuranceId ที่รับมาจาก query
+                where: { insuranceId: insuranceId },
+                required: true,
+                include: [
+                    { model: Customer, include: [{ model: User, attributes: ['firstName', 'lastName', 'phoneNumber'] }] },
+                    { model: Car, attributes: ['brand', 'model', 'licensePlate'] },
+                    { model: Garage, attributes: ['garageName'] }
+                ]
+            }],
+            order: [['createdAt', 'ASC']]
+        });
+
+        // (Map ข้อมูลให้ตรงกับ Mockup - เหมือนเดิม)
+        const formattedRequests = requests.map(req => {
+            const claim = req.Claim || {};
+            const customerUser = claim.Customer?.User || {};
+            const car = claim.Car || {};
+
+            return {
+                id: req.id,
+                type: 'urgent_repair',
+                claimNumber: `CLM-${claim.id}`,
+                claimId: claim.id,
+                customerName: `${customerUser.firstName || ''} ${customerUser.lastName || ''}`.trim(),
+                customerPhone: customerUser.phoneNumber || '',
+                carModel: `${car.brand || ''} ${car.model || ''}`.trim(),
+                licensePlate: car.licensePlate || '',
+                reason: req.type,
+                description: req.detail,
+                attachments: req.fileURL ? [req.fileURL] : [],
+                requestedDate: req.createdAt,
+                status: 'pending',
+                garageName: claim.Garage?.garageName || 'N/A',
+            };
+        });
+
+        res.status(200).json(formattedRequests);
+
+    } catch (error) {
+        console.error('Error fetching customer approvals:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+
+// -----------------------------------------------------------------
+// ⭐️ 13. (Route ใหม่) อนุมัติ/ปฏิเสธ คำขอ (Urgent/Additional)
+// (แก้ไข: เอา authenticate ออก)
+// -----------------------------------------------------------------
+/**
+ * @route   PUT /api/claims/approvals/:id/decide
+ * @desc    (NEW) อนุมัติ (ส่งต่ออู่) หรือ ปฏิเสธ คำขอซ่อมด่วน
+ * @access  Private (Insurance)
+ */
+router.put('/approvals/:id/decide', async (req, res) => {
+
+    // ⭐️ (แก้ไข) รับ action, rejectReason จาก body (insuranceId ไม่ต้องใช้ใน logic นี้)
+    const { action, rejectReason } = req.body;
+    const { id } = req.params; // นี่คือ UrgentRequest ID
+
+    try {
+        const request = await UrgentRequest.findByPk(id);
+        if (!request) {
+            return res.status(404).json({ message: 'Request not found' });
+        }
+
+        if (action === 'approve') {
+            await request.update({
+                approver: 'garage',
+                approvalStatus: 'pending'
+            });
+            res.status(200).json({ message: 'Request approved and forwarded to garage' });
+
+        } else if (action === 'reject') {
+            await request.update({
+                approvalStatus: 'rejected',
+                rejectReason: rejectReason || 'ไม่ระบุเหตุผล'
+            });
+            res.status(200).json({ message: 'Request rejected' });
+
+        } else {
+            return res.status(400).json({ message: 'Invalid action' });
+        }
+
+    } catch (error) {
+        console.error('Error deciding urgent request:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
 
 module.exports = router;
-
-
