@@ -2,49 +2,76 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from "axios";
+// ⭐️ (ลบ) ไม่ต้องใช้ Cookies
+// import Cookies from 'js-cookie';
 
 /**
  * InsuranceSidebar - Sidebar สำหรับบริษัทประกันภัย
- * เมนูหลัก: การเคลม, คำขออนุมัติ, วิเคราะห์
- * 
- * Props:
- * - collapsed: boolean - เมื่อเป็น true จะแสดงแค่ icon
+ * ... (Comments เดิม) ...
  */
-
-
 const InsuranceSidebar = ({ collapsed = false }) => {
     const location = useLocation();
 
-    // ✅ สร้าง state สำหรับ Quick Stats
+    // ⭐️ 1. (เพิ่ม) State สำหรับเก็บ User ที่ login (เหมือน CreateClaim/Approvals)
+    const [currentUser, setCurrentUser] = useState(null);
+
+    // ⭐️ 2. (แก้ไข) เพิ่ม State ใหม่ๆ ให้ครบ
     const [stats, setStats] = useState({
         totalClaims: 0,
-        pendingClaims: 0,
-        completedClaims: 0
+        allPendingClaims: 0, // ⬅️ (เปลี่ยนชื่อ) สำหรับ Quick Stats
+        completedClaims: 0,
+        activeClaimsBadge: 0, // ⬅️ (เพิ่ม) สำหรับ Badge 1
+        approvalRequests: 0   // ⬅️ (เพิ่ม) สำหรับ Badge 2
     });
 
-    // ✅ ดึงข้อมูลจาก backend ตอนโหลด component
+    // ⭐️ 3. (เพิ่ม) useEffect นี้ เพื่อดึงข้อมูล User จาก localStorage
     useEffect(() => {
+        const stored = localStorage.getItem("claimmate_user");
+        if (stored) {
+            const userData = JSON.parse(stored);
+            if (userData && userData.insuranceID) {
+                setCurrentUser(userData);
+            } else {
+                console.error("Sidebar: User data in localStorage is missing insuranceID");
+            }
+        }
+    }, []);
+
+    // ⭐️ 4. (แก้ไข) useEffect นี้ ให้ดึงข้อมูลโดยใช้ currentUser
+    useEffect(() => {
+        // (รอจนกว่า currentUser จะพร้อม)
+        if (!currentUser) return;
+
         const fetchStats = async () => {
             try {
-                const res = await axios.get('http://localhost:3000/api/claims/stats');
-                setStats(res.data);
+                // (ลบ Token)
+                // ⭐️ (แก้ไข) เปลี่ยน URL และเพิ่ม params
+                // (หมายเหตุ: ถ้าคุณตั้ง proxy ใน package.json แล้ว ให้ลบ "http://localhost:3000" ออก)
+                const res = await axios.get('http://localhost:3000/api/claims/stats', {
+                    params: {
+                        insuranceId: currentUser.insuranceID // ⬅️ (ส่ง ID ไปใน query)
+                    }
+                });
+                setStats(res.data); // (API จะส่ง state ทั้งหมดกลับมา)
             } catch (err) {
                 console.error('Error fetching stats:', err);
             }
         };
 
         fetchStats();
-        const interval = setInterval(fetchStats, 30000); // refresh ทุก 30 วิ
+        const interval = setInterval(fetchStats, 30000);
         return () => clearInterval(interval);
-    }, []);
 
+    }, [currentUser]); // ⬅️ (ให้ re-run เมื่อ currentUser พร้อม)
+
+    // ⭐️ 5. (แก้ไข) menuItems
     const menuItems = [
         {
             id: 'claims-active',
             title: 'เคสที่กำลังดำเนินการ',
             icon: 'assignment',
             path: '/insurance/claims/active',
-            badge: stats.pendingClaims, // เคสที่รอดำเนินการ
+            badge: stats.activeClaimsBadge, // ⬅️ (เชื่อม Badge 1 - Logic ใหม่)
         },
         {
             id: 'claims-history',
@@ -58,19 +85,13 @@ const InsuranceSidebar = ({ collapsed = false }) => {
             icon: 'approval',
             path: '/insurance/approvals',
             description: 'อนุมัติจากลูกค้าและอู่',
-            badge: 5, // จำนวนคำขอที่รออนุมัติ
-            highlight: true,
-        },
-        {
-            id: 'analytics',
-            title: 'วิเคราะห์และรายงาน',
-            icon: 'analytics',
-            path: '/insurance/analytics',
-            description: 'สถิติ, ต้นทุน, รายงานประจำเดือน',
+            badge: stats.approvalRequests, // ⬅️ (เชื่อม Badge 2)
+            highlight: stats.approvalRequests > 0, // ⬅️ (ให้กระพริบถ้ามี)
         },
     ];
 
-    // เช็คว่า path ปัจจุบันตรงกับ menu item หรือไม่
+    // (โค้ดส่วนที่เหลือเหมือนเดิมเป๊ะ)
+
     const isActive = (path) => location.pathname.startsWith(path);
 
     return (
@@ -90,9 +111,9 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                                 className={`
                   group relative flex items-center justify-center w-full h-14 rounded-xl transition-all duration-300
                   ${isActive(item.path)
-                                        ? 'bg-gradient-primary text-white shadow-button'
-                                        : 'text-neutral-600 hover:bg-neutral-50 hover:text-primary-600'
-                                    }
+                                    ? 'bg-gradient-primary text-white shadow-button'
+                                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-primary-600'
+                                }
                 `}
                                 title={item.title}
                             >
@@ -105,13 +126,13 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                                 </span>
 
                                 {/* Badge */}
-                                {item.badge && (
+                                {item.badge && item.badge > 0 && (
                                     <span className={`
                     absolute top-2 right-2 w-5 h-5 text-xs font-bold rounded-full flex items-center justify-center
                     ${item.highlight
-                                            ? 'bg-error text-white animate-bounce'
-                                            : 'bg-primary-500 text-white'
-                                        }
+                                        ? 'bg-error text-white animate-bounce'
+                                        : 'bg-primary-500 text-white'
+                                    }
                   `}>
                                         {item.badge}
                                     </span>
@@ -145,9 +166,9 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                                     className={`
                     group flex items-start gap-3 px-4 py-3 rounded-xl transition-all duration-300
                     ${isActive(item.path)
-                                            ? 'bg-gradient-primary text-white shadow-button'
-                                            : 'text-neutral-600 hover:bg-neutral-50 hover:text-primary-600'
-                                        }
+                                        ? 'bg-gradient-primary text-white shadow-button'
+                                        : 'text-neutral-600 hover:bg-neutral-50 hover:text-primary-600'
+                                    }
                   `}
                                 >
                                     {/* Icon */}
@@ -167,15 +188,15 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                                             </span>
 
                                             {/* Badge */}
-                                            {item.badge && (
+                                            {item.badge && item.badge > 0 && (
                                                 <span className={`
                           px-2 py-0.5 text-xs font-bold rounded-full
                           ${isActive(item.path)
-                                                        ? 'bg-white/20 text-white'
-                                                        : item.highlight
-                                                            ? 'bg-error text-white animate-bounce'
-                                                            : 'bg-primary-500 text-white'
-                                                    }
+                                                    ? 'bg-white/20 text-white'
+                                                    : item.highlight
+                                                        ? 'bg-error text-white animate-bounce'
+                                                        : 'bg-primary-500 text-white'
+                                                }
                         `}>
                                                     {item.badge}
                                                 </span>
@@ -230,7 +251,7 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                             </div>
                         </div>
 
-                        {/* TODO: Backend - Quick Stats */}
+                        {/* ⭐️ 6. (แก้ไข) Quick Stats */}
                         <div className="mt-6 space-y-3">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-neutral-500">เคลมทั้งหมด</span>
@@ -238,7 +259,9 @@ const InsuranceSidebar = ({ collapsed = false }) => {
                             </div>
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-neutral-500">รอดำเนินการ</span>
-                                <span className="font-semibold text-warning">{stats.pendingClaims}</span>
+                                {/* ⬅️ (ใช้ allPendingClaims ที่มี Logic 'isClosed: false') */}
+                                <span className="font-semibold text-warning">{stats.allPendingClaims}</span>
+
                             </div>
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-neutral-500">เสร็จสิ้น</span>
