@@ -14,7 +14,6 @@ const {
     RepairItem,
     AdditionalSurvey,
     AdditionalApprove,   // ⬅️ ตรวจสอบว่ามี
-    Satisfaction,
     Garage,
     UrgentRequest,
     ChooseGarageRequest,
@@ -674,10 +673,6 @@ router.get('/history', async (req, res) => {
                     ]
                 },
                 {
-                    model: Satisfaction,
-                    required: false
-                },
-                {
                     // ⭐️ (3. เพิ่ม Insurance -> User)
                     model: Insurance,
                     attributes: ['id'],
@@ -695,7 +690,6 @@ router.get('/history', async (req, res) => {
             const customerUser = claim.Customer?.User || {};
             const car = claim.Car || {};
             const status = claim.ClaimStatus || {};
-            const satisfaction = claim.Satisfaction || {};
             const officerUser = claim.Insurance?.User || {}; // ⬅️ ดึง Officer
 
             // ⬅️ (UI ต้องการชื่อ Officer)
@@ -714,9 +708,6 @@ router.get('/history', async (req, res) => {
 
                 // ⬅️ (แก้ไข) ใช้ approvedCost ถ้ามี, ถ้าไม่มีใช้ estimateCost
                 approvedAmount: claim.approvedCost || claim.estimateCost || 0,
-
-                // ⬅️ (แก้ไข) เปลี่ยนชื่อ field เป็น satisfaction
-                satisfaction: satisfaction.rating || 0, // (ใช้ 0 ถ้าเป็น null)
 
                 assignedOfficer: assignedOfficerName, // ⬅️ (เพิ่ม)
 

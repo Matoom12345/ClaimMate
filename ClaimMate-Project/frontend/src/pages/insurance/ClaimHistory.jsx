@@ -96,32 +96,9 @@ const ClaimHistory = () => {
   const stats = {
     totalClaims: filteredClaims.length,
     totalAmount: filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0),
-    averageSatisfaction: filteredClaims.length > 0
-        ? (filteredClaims.reduce((sum, claim) => sum + (claim.satisfaction || 0), 0) / filteredClaims.length).toFixed(1) // (ใช้ claim.satisfaction)
-        : 0,
     averageAmount: filteredClaims.length > 0
         ? Math.round(filteredClaims.reduce((sum, claim) => sum + claim.approvedAmount, 0) / filteredClaims.length)
         : 0,
-  };
-
-  // Render satisfaction stars
-  const renderStars = (rating) => {
-    // (กัน rating เป็น null หรือ 0)
-    const validRating = Number(rating) || 0;
-    return (
-        <div className="flex items-center gap-0.5">
-          {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                  key={star}
-                  className={`material-icons-round text-base ${
-                      star <= validRating ? 'text-yellow-400' : 'text-neutral-300'
-                  }`}
-              >
-            star
-          </span>
-          ))}
-        </div>
-    );
   };
 
   if (loading) {
@@ -188,29 +165,6 @@ const ClaimHistory = () => {
               </div>
               <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
                 <span className="material-icons-round text-2xl text-primary-600">payments</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Average Satisfaction */}
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-neutral-500 text-sm mb-1">ความพึงพอใจ</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-neutral-dark">{stats.averageSatisfaction}</p>
-                  <p className="text-neutral-400 text-sm">/5.0</p>
-                </div>
-                <div className="flex gap-0.5 mt-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                      <span key={star} className="material-icons-round text-xs text-yellow-400">
-                    star
-                  </span>
-                  ))}
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-                <span className="material-icons-round text-2xl text-primary-600">sentiment_satisfied</span>
               </div>
             </div>
           </div>
@@ -328,16 +282,6 @@ const ClaimHistory = () => {
                           {/* ⬅️ (ใช้ field ใหม่) */}
                           ฿{claim.approvedAmount.toLocaleString()}
                         </p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex flex-col items-center gap-1">
-                          {/* ⬅️ (ใช้ field ใหม่) */}
-                          {renderStars(claim.satisfaction)}
-                          <span className="text-xs font-medium text-neutral-600">
-                             {/* ⬅️ (ใช้ field ใหม่) */}
-                            {Number(claim.satisfaction || 0).toFixed(1)}/5.0
-                          </span>
-                        </div>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <Link
